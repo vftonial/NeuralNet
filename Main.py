@@ -61,7 +61,7 @@ class Problem:
                 line = line.split(";")
                 for node in line:
                     for weight in node:
-                        self.neural_net.hidden_layers[layer][node_index].append(int(weight))
+                        self.neural_net.hidden_layers[layer][node_index].weights.append(int(weight))
                         node_index = node_index + 1
                     node_index = 0
 
