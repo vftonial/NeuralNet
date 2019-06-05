@@ -1,4 +1,5 @@
 import copy
+import random
 
 
 # seu valor de ativacao, a lista de pesos que entram nele
@@ -6,6 +7,10 @@ import copy
 class Node:
     activation = 0
     weights = []
+
+    def __init__(self, activation, weights):
+        self.activation = activation
+        self.weights = weights
 
 
 class Layer:
@@ -23,7 +28,7 @@ class Instance:
 
 class NeuralNet:
     input_layer = []
-    hidden_layers = [[]]
+    hidden_layers = []  # [[]]
     output_layer = []
     regularization = 0
 
@@ -39,17 +44,17 @@ class Problem:
         self.neural_net.regularization = int(lines[0])
 
         for i in range(int(lines[1]) + 1):  # +1 para adicionar o termo de bias
-            self.neural_net.input_layer.append(Node())
+            self.neural_net.input_layer.append(Node(0, []))
 
         for line in lines[2:len(lines) - 1]:  # aparentemente corta antes da ultima entrada
             for i in range(int(line) + 1):  # +1 para adicionar o termo de bias
-                self.neural_net.hidden_layers[layer].append(Node())  # certamente esta errado, mas no meu teste funciona
+                self.neural_net.hidden_layers.append([])
+                self.neural_net.hidden_layers[layer].append(
+                    Node(0, []))  # certamente esta errado, mas no meu teste funciona
             layer = layer + 1
-            self.neural_net.hidden_layers.append([])
-        self.neural_net.hidden_layers.remove(self.neural_net.hidden_layers[layer])
 
         for i in range(int(lines[len(lines)])):
-            self.neural_net.output_layer.append(Node())
+            self.neural_net.output_layer.append(Node(0, []))
 
     def read_weights(self, filename):
         file = open(filename, "r")
@@ -81,8 +86,8 @@ class Problem:
             instance = Instance(list(map(float, data)), list(map(float, result)))
             self.instances.append(copy.deepcopy(instance))
 
-    def backpropagation(self, filename):
-        # inicializar os pesos da rede com n zero
+    def backpropagation(self, n_layers, n_nodes):
+        # inicializar os pesos da rede com não zero
         # para cada exemplo no treinamento
         #   propagar o exemplo na rede
         #   calcular o erro na camada de saida
@@ -90,4 +95,10 @@ class Problem:
         #   calcular os gradiantes
         #   ajustar os pesos
         # avaliar a performance no conjunto de treinamento, se ainda não ta decente roda dnv
-        self.read_network(filename)
+        self.neural_net = NeuralNet()
+        # adicionar o primeiro layer com base no conjunto de entradas
+        for i in n_layers:
+            self.neural_net.hidden_layers.append([])
+            for n in n_nodes:
+                self.neural_net.hidden_layers[i].append(Node(0, list(random.uniform(0, 1) for x in range(n_nodes))))
+        # adicionaro o ultimo layer com base no conjunto de entradas
