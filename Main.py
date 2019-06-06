@@ -86,7 +86,7 @@ class Problem:
             instance = Instance(list(map(float, data)), list(map(float, result)))
             self.instances.append(copy.deepcopy(instance))
 
-    def backpropagation(self, n_layers, n_nodes):
+    def backpropagation(self, n_layers, n_nodes, instances):
         # inicializar os pesos da rede com não zero
         # para cada exemplo no treinamento
         #   propagar o exemplo na rede
@@ -99,6 +99,9 @@ class Problem:
         # adicionar o primeiro layer com base no conjunto de entradas
         for i in n_layers:
             self.neural_net.hidden_layers.append([])
-            for n in n_nodes:
-                self.neural_net.hidden_layers[i].append(Node(0, list(random.uniform(0, 1) for x in range(n_nodes))))
+            for _ in n_nodes:
+                self.neural_net.hidden_layers[i].append(Node(0, list(random.uniform(0, 1) for _ in range(n_nodes))))
+
         # adicionaro o ultimo layer com base no conjunto de entradas
+        self.neural_net.output_layer.append(Node(0, list(random.uniform(0, 1) for _ in range(n_nodes))) for _ in
+                                            range(len(instances[0].result)))  # issae fe
