@@ -86,7 +86,7 @@ class Problem:
             instance = Instance(list(map(float, data)), list(map(float, result)))
             self.instances.append(copy.deepcopy(instance))
 
-    def backpropagation(self, n_layers, n_nodes, instances):
+    def backpropagation(self, n_layers, n_nodes):
         # inicializar os pesos da rede com não zero
         # para cada exemplo no treinamento
         #   propagar o exemplo na rede
@@ -95,8 +95,12 @@ class Problem:
         #   calcular os gradiantes
         #   ajustar os pesos
         # avaliar a performance no conjunto de treinamento, se ainda não ta decente roda dnv
+
         self.neural_net = NeuralNet()
         # adicionar o primeiro layer com base no conjunto de entradas
+        self.neural_net.input_layer.append(Node(0, list(random.uniform(0, 1) for _ in range(n_nodes))) for _ in
+                                           range(len(self.instances[0].data)))
+        # adicionar os hidden layers
         for i in n_layers:
             self.neural_net.hidden_layers.append([])
             for _ in n_nodes:
@@ -104,4 +108,8 @@ class Problem:
 
         # adicionaro o ultimo layer com base no conjunto de entradas
         self.neural_net.output_layer.append(Node(0, list(random.uniform(0, 1) for _ in range(n_nodes))) for _ in
-                                            range(len(instances[0].result)))  # issae fe
+                                            range(len(self.instances[0].result)))  # issae fe
+
+        self.propagate()
+        # comparar o valor de ativaçao do nodo de saida com o valor previsto na instancia e atualizar o seu peso
+        self.atualization()
