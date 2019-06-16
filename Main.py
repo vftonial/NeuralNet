@@ -6,15 +6,14 @@ import random
 # casos especificos para o primeiro e ultimo layer
 class Node:
     activation = 0
-    weights = []
+    weights = None
 
     def __init__(self, activation, weights):
         self.activation = activation
         self.weights = weights
 
-
-class Layer:
-    nodes_vector = []
+    def __init__(self, activation):
+        self.activation = activation
 
 
 class Instance:
@@ -31,6 +30,29 @@ class NeuralNet:
     hidden_layers = []  # [[]]
     output_layer = []
     regularization = 0
+
+    def create_input_layer(self, activation_list):
+        for x in activation_list:
+            self.input_layer.append(Node(x))
+
+    def create_hidden_layers(self, input_size, n_nodes, n_layers):
+        # adicionar o primeiro layer com base no conjunto de entradas
+        first_layer = self.create_layer(input_size, n_nodes)
+        self.hidden_layers.append(first_layer)
+        # adicionar os hidden layers
+        for _ in n_layers - 1:
+            hidden_layer = self.create_layer(n_nodes, n_nodes)
+            self.hidden_layers.append(hidden_layer)
+
+    def create_output_layer(self, n_weights, n_nodes):
+        self.output_layer = create_layer(n_weights, n_nodes)
+
+    def create_layer(self, n_weights, n_nodes):
+        layer = []
+        for _ in range(n_nodes):
+            weights = list(random.uniform(0, 1) for _ in range(n_weights))
+            layer.append(Node(0, weights))
+        return layer
 
 
 class Problem:
@@ -96,20 +118,19 @@ class Problem:
         #   ajustar os pesos
         # avaliar a performance no conjunto de treinamento, se ainda não ta decente roda dnv
 
+        size_input_layer = len(self.instances[0].data)
+        size_output_layer = len(self.instances[0].result)
+
         self.neural_net = NeuralNet()
-        # adicionar o primeiro layer com base no conjunto de entradas
-        self.neural_net.input_layer.append(Node(0, list(random.uniform(0, 1) for _ in range(n_nodes))) for _ in
-                                           range(len(self.instances[0].data)))
-        # adicionar os hidden layers
-        for i in n_layers:
-            self.neural_net.hidden_layers.append([])
-            for _ in n_nodes:
-                self.neural_net.hidden_layers[i].append(Node(0, list(random.uniform(0, 1) for _ in range(n_nodes))))
+        # criar hidden layers
+        self.neuralnet.create_hidden_layers(size_input_layer, n_nodes, n_layers)
+        # adicionar o ultimo layer com base no conjunto de entradas
+        self.neural_net.create_output_layer(n_nodes, size_output_layer)
 
-        # adicionaro o ultimo layer com base no conjunto de entradas
-        self.neural_net.output_layer.append(Node(0, list(random.uniform(0, 1) for _ in range(n_nodes))) for _ in
-                                            range(len(self.instances[0].result)))  # issae fe
+        for instance in self.instances:
+            self.propagate(instance)
+            # comparar o valor de ativaçao do nodo de saida com o valor previsto na instancia e atualizar o seu peso
+            self.atualization()
 
-        self.propagate()
-        # comparar o valor de ativaçao do nodo de saida com o valor previsto na instancia e atualizar o seu peso
-        self.atualization()
+    def propagate(self, instance):
+        # todo
