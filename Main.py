@@ -1,5 +1,6 @@
 import copy
 import random
+import math
 
 
 # seu valor de ativacao, a lista de pesos que entram nele
@@ -7,6 +8,7 @@ import random
 class Node:
     activation = 0
     weights = None
+    error = 0
 
     def __init__(self, activation, weights):
         self.activation = activation
@@ -53,6 +55,57 @@ class NeuralNet:
             weights = list(random.uniform(0, 1) for _ in range(n_weights))
             layer.append(Node(0, weights))
         return layer
+
+    def output_layer_errors(self, expected_result):
+        for index in range(len(self.output_layer)):
+            f = output_layer[index].activation
+            y = expected_result[index]
+            output_layer[index].error = f - y
+
+    def all_layers_errors(self, expected_result):
+        self.output_layer_errors(expected_result)
+        self.hidden_layer_errors(len(self.hidden_layers) - 1, self.output_layer)
+
+
+    def hidden_layer_errors(self, layer, next_layer):
+        if(layer >= 0):
+            current_layer = self.hidden_layers[layer]
+            current_layer_size = len(current_layer)
+            for node in range(1, current_layer_size): # i
+                next_layer_nodes = len(next_layer) # j in N
+                weights_x_error = list(next_layer[j].weights[node] * next_layer[j].error for j in range(1, next_layer_nodes))
+                node_activation = current_layer[node].activation
+                current_layer[node].error = sum(weights_x_error) * node_activation * (1 - node_activation)
+            self.hidden_layers(layer - 1, current_layer)
+
+    def gradient(self, layer, first_node, second_node):
+        if(first_node == 0):
+            return 1
+        elif(layer == len(self.hidden_layers)):
+            current_layer = self.output_layer
+        else:
+            current_layer = self.hidden_layers[layer]
+        previous_layer = self.hidden_layers[layer - 1]
+        return previous_layer[first_node].activation * current_layer[second_node].error
+
+    def ajust_weights(self, alpha, total_error):
+        for layer_i in range(len(self.hidden_layers)):
+            layer = self.hidden_layers[layer_i]
+            for node_i in range(len(layer)):
+                node = layer[node_i]
+                for weight_i in range(len(node.weights)):
+                    grad = self.gradient(layer_i, weight_i, node_i)
+                    node.weights[weight_i] = node.weights[weight_i] - alpha * grad * total_error
+
+    def J(self, instances):
+        summ = 0
+        for i in range(len(instances)):
+            instance = instances[i]
+            for k in range(len(instance.result)):
+                y = instance.result[k]
+                f = ######################################## result of propagation
+                summ += -y * math.log10(f) - (1 - y) * math.log10(1 - f)  
+        return summ / len(instances)
 
 
 class Problem:
@@ -134,3 +187,4 @@ class Problem:
 
     def propagate(self, instance):
         # todo
+        
