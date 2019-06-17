@@ -62,50 +62,70 @@ class NeuralNet:
             y = expected_result[index]
             output_layer[index].error = f - y
 
-    def all_layers_errors(self, expected_result):
-        self.output_layer_errors(expected_result)
-        self.hidden_layer_errors(len(self.hidden_layers) - 1, self.output_layer)
-
-
-    def hidden_layer_errors(self, layer, next_layer):
+    def hidden_layer_errors(self, layer_i, next_layer):
         if(layer >= 0):
-            current_layer = self.hidden_layers[layer]
+            current_layer = self.hidden_layers[layer_i]
             current_layer_size = len(current_layer)
             for node in range(1, current_layer_size): # i
                 next_layer_nodes = len(next_layer) # j in N
                 weights_x_error = list(next_layer[j].weights[node] * next_layer[j].error for j in range(1, next_layer_nodes))
                 node_activation = current_layer[node].activation
                 current_layer[node].error = sum(weights_x_error) * node_activation * (1 - node_activation)
-            self.hidden_layers(layer - 1, current_layer)
+            self.hidden_layer_errors(layer_i - 1, current_layer[1:])
 
-    def gradient(self, layer, first_node, second_node):
-        if(first_node == 0):
-            return 1
-        elif(layer == len(self.hidden_layers)):
+    def all_layers_errors(self, expected_result):
+        self.output_layer_errors(expected_result)
+        self.hidden_layer_errors(len(self.hidden_layers) - 1, self.output_layer)
+
+    def gradient(self, layer, first_node, second_node): # MAYBE ITS WRONG
+        if(layer == len(self.hidden_layers)):
             current_layer = self.output_layer
         else:
             current_layer = self.hidden_layers[layer]
         previous_layer = self.hidden_layers[layer - 1]
         return previous_layer[first_node].activation * current_layer[second_node].error
 
-    def ajust_weights(self, alpha, total_error):
+    def ajust_weights(self, alpha):
         for layer_i in range(len(self.hidden_layers)):
             layer = self.hidden_layers[layer_i]
             for node_i in range(len(layer)):
                 node = layer[node_i]
                 for weight_i in range(len(node.weights)):
                     grad = self.gradient(layer_i, weight_i, node_i)
-                    node.weights[weight_i] = node.weights[weight_i] - alpha * grad * total_error
+                    node.weights[weight_i] = node.weights[weight_i] - alpha * grad
 
-    def J(self, instances):
+    def cost(self, instances):
         summ = 0
         for i in range(len(instances)):
             instance = instances[i]
             for k in range(len(instance.result)):
                 y = instance.result[k]
-                f = ######################################## result of propagation
-                summ += -y * math.log10(f) - (1 - y) * math.log10(1 - f)  
+                f = self.output_layer[k].activation
+                summ += -y * math.log(f) - (1 - y) * math.log(1 - f)  
         return summ / len(instances)
+
+    def propagate_layer(self, from_layer, to_layer):
+        for to_node in to_layer[1:]:
+            to_node.activation = 0
+            for from_node_index in range(len(from_layer)):
+                from_node = from_layer[from_node_index]
+                to_node.activation += from_node.activation * to_node.weights[from_node_index]
+                to_node.activation = self.sigmoid(to_node.activation)
+
+    def propagate_input_layer(self):
+        self.propagate_layer(self.input_layer, self.hidden_layers[0])
+
+    def propagate_hidden_layers(self):
+        for layer_index in range(len(self.hidden_layers) - 1):
+            from_layer = self.hidden_layers[layer_index]
+            to_layer = self.hidden_layers[layer_index + 1]
+            self.propagate_layer(from_layer, to_layer)
+
+    def propagate_output_layer(self):
+        self.propagate_layer(self.hidden_layer[-1], self.output_layer)
+
+    def sigmoid(self, x):
+        return 1 / (1 + math.exp(- x))
 
 
 class Problem:
@@ -181,10 +201,16 @@ class Problem:
         self.neural_net.create_output_layer(n_nodes, size_output_layer)
 
         for instance in self.instances:
-            self.propagate(instance)
+            self.neuralnet.create_input_layer(instance.data)
+            self.propagate()
             # comparar o valor de ativaçao do nodo de saida com o valor previsto na instancia e atualizar o seu peso
             self.atualization()
 
-    def propagate(self, instance):
-        # todo
-        
+    def propagate(self):
+        self.neuralnet.propagate_input_layer()
+        self.neuralnet.propagate_hidden_layers()
+        self.neuralnet.propagate_output_layer()
+
+    def atualization(self, expected_result):
+        self.neuralnet.all_layers_errors(expected_result)
+        self.neuralnet.ajust_weights(0.9, )
