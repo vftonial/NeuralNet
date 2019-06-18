@@ -1,6 +1,7 @@
 import copy
 import random
 import math
+import statistics
 
 
 # seu valor de ativacao, a lista de pesos que entram nele
@@ -60,7 +61,7 @@ class NeuralNet:
             self.output_layer[index].error = f - y
 
     def hidden_layer_errors(self, layer_i, next_layer):
-        if (layer_i >= 0):
+        if layer_i >= 0:
             current_layer = self.hidden_layers[layer_i]
             current_layer_size = len(current_layer)
             for node in range(1, current_layer_size):  # i
@@ -212,3 +213,77 @@ class Problem:
     def atualization(self, expected_result):
         self.neural_net.all_layers_errors(expected_result)
         self.neural_net.adjust_weights(0.9)
+
+
+class PreProcess:
+    data = None
+
+    def calculate_max_min_mean_deviation(self, file):
+        infile = open(file, "r")
+        #              min      max   mean  dev
+        self.data = [[9999.0, -9999.0, 0.0, 0.0] for _ in range(9)]
+        raw_data = [[] for _ in range(9)]
+        pulaessamerda = True
+        for line in infile.readlines():
+            if pulaessamerda:
+                pulaessamerda = False
+            else:
+                # print(line)
+                i = 0
+                for number in line.split():
+                    raw_data[i].append(float(number))
+                    if self.data[i][0] > float(number):
+                        self.data[i][0] = float(number)
+                    if self.data[i][1] < float(number):
+                        self.data[i][1] = float(number)
+                    self.data[i][2] += float(number)
+                    i += 1
+        for i in range(len(self.data)):
+            self.data[i][2] = float("{0:.3f}".format(self.data[i][2] / float(len(raw_data[0]))))
+        infile.close()
+        i = 0
+        for att in raw_data:
+            self.data[i][3] = float(statistics.stdev(att))
+            i += 1
+        return self.data
+
+    def norma_and_stand(self, file):
+        infile = open(file, "r")
+        normal_file = open("pimaNormalizado.txt", "w", newline="\n")
+        standard_file = open("pimaPadronizado.txt", "w", newline="\n")
+        pulaessamerda = True
+        for line in infile.readlines():
+            if pulaessamerda:
+                pulaessamerda = False
+            else:
+                i = 0
+                for number in line.split():
+                    if i < len(line.split()) - 1:
+                        normal_number = (float(number) - self.data[i][0]) / (self.data[i][1] - self.data[i][0])
+                        standard_number = (float(number) - self.data[i][2]) / self.data[i][3]
+                        normal_file.write("{0:.3f}".format(normal_number) + " ")
+                        standard_file.write("{0:.3f}".format(standard_number) + " ")
+                        i += 1
+                    else:
+                        normal_file.write(str(number))
+                        standard_file.write(str(number))
+                normal_file.write("\n")
+                standard_file.write("\n")
+        normal_file.close()
+        standard_file.close()
+        infile.close()
+
+    # Only for pima.tsv
+    def process_file(self, filename):
+        self.calculate_max_min_mean_deviation(filename)
+        self.norma_and_stand(filename)
+
+
+def main():
+    file = "E:\\pima.tsv"
+    processor = PreProcess()
+    processor.process_file(file)
+
+
+if __name__ == "__main__":
+    main()
