@@ -222,7 +222,7 @@ class PreProcess:
         infile = open(middle_file, "r")
         lines = infile.readlines()
         # total of columns, att + class
-        metadata = lines[0]
+        metadata = len(lines[0].split())
         #              min      max   mean  dev
         self.data = [[9999.0, -9999.0, 0.0, 0.0] for _ in range(int(metadata))]
         raw_data = [[] for _ in range(int(metadata))]
@@ -249,7 +249,7 @@ class PreProcess:
         infile = open(middle_file, "r")
         normal_file = open(real_name + "Normalizado.txt", "w", newline="\n")
         standard_file = open(real_name + "Padronizado.txt", "w", newline="\n")
-        for line in infile.readlines()[1:]:
+        for line in infile.readlines():
             i = 0
             for number in line.split():
                 if i < len(line.split()) - 1:
@@ -271,9 +271,7 @@ class PreProcess:
         infile = open(filename, "r")
         middle_file = PreProcess.get_filename_from_path(filename) + "Intermediario.txt"
         outfile = open(middle_file, "w", newline="\n")
-        lines = infile.readlines()
-        outfile.write(str(len(lines[1].split())) + "\n")
-        for line in lines[1:]:
+        for line in infile.readlines()[1:]:
             outfile.write(line)
         return middle_file
 
