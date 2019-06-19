@@ -76,21 +76,23 @@ class NeuralNet:
         self.output_layer_errors(expected_result)
         self.hidden_layer_errors(len(self.hidden_layers) - 1, self.output_layer)
 
-    def gradient(self, layer, first_node, second_node):  # MAYBE ITS WRONG
+    def gradient(self, layer, first_node, second_node, lamb):  # MAYBE ITS WRONG
+        if first_node == 0:
+            lamb = 0
         if layer == len(self.hidden_layers):
             current_layer = self.output_layer
         else:
             current_layer = self.hidden_layers[layer]
         previous_layer = self.hidden_layers[layer - 1]
-        return previous_layer[first_node].activation * current_layer[second_node].error
+        return previous_layer[first_node].activation * current_layer[second_node].error + lamb * current_layer[second_node].weights[first_node]
 
-    def adjust_weights(self, alpha):
+    def adjust_weights(self, alpha, lamb):
         for layer_i in range(len(self.hidden_layers)):
             layer = self.hidden_layers[layer_i]
             for node_i in range(len(layer)):
                 node = layer[node_i]
                 for weight_i in range(len(node.weights)):
-                    grad = self.gradient(layer_i, weight_i, node_i)
+                    grad = self.gradient(layer_i, weight_i, node_i, lamb)
                     node.weights[weight_i] = node.weights[weight_i] - alpha * grad
 
     def cost(self, instances):
