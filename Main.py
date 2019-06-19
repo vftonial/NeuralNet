@@ -131,6 +131,16 @@ class Problem:
     instances = []
     neural_net = NeuralNet()
 
+    def read_normalized_file(self, filename):
+        file = open(filename, "r")
+        lines = file.readlines()
+        for line in lines:
+            line = line.split()
+            data = line[:-1]
+            result = line[-1]
+            instance = Instance(list(map(float, data)), list(map(float, result)))
+            self.instances.append(copy.deepcopy(instance))
+
     def read_network(self, filename):
         layer = 0
         file = open(filename, "r")
@@ -353,8 +363,10 @@ def main():
     # processor.process_file(wine, PreProcess.format_wine)
     # processor = PreProcess()
     # processor.process_file(ionosphere, PreProcess.format_ionosphere)
-    processor = PreProcess()
-    processor.process_file(wdbc, PreProcess.format_wdbc)
+    # processor = PreProcess()
+    # processor.process_file(wdbc, PreProcess.format_wdbc)
+    # problem = Problem()
+    # problem.read_normalized_file("normal_files\\wdbcNormalizado.txt")
 
 
 if __name__ == "__main__":
