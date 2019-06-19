@@ -2,7 +2,7 @@ import copy
 import random
 import math
 import statistics
-
+import os
 
 # seu valor de ativacao, a lista de pesos que entram nele
 # casos especificos para o primeiro e ultimo layer
@@ -243,20 +243,22 @@ class PreProcess:
         for att in raw_data:
             self.data[i][3] = float(statistics.stdev(att))
             i += 1
-        return self.data
 
-    def norma_and_stand(self, middle_file,  real_name):
+    def norma_and_stand(self, middle_file, real_name):
         infile = open(middle_file, "r")
-        normal_file = open(real_name + "Normalizado.txt", "w", newline="\n")
-        standard_file = open(real_name + "Padronizado.txt", "w", newline="\n")
+        if not os.path.exists("normal_files"):
+            os.mkdir("normal_files")
+            os.mkdir("standard_files")
+        normal_file = open("normal_files\\" + real_name + "Normalizado.txt", "w", newline="\n")
+        standard_file = open("standard_files\\" + real_name + "Padronizado.txt", "w", newline="\n")
         for line in infile.readlines():
             i = 0
             for number in line.split():
                 if i < len(line.split()) - 1:
                     normal_number = (float(number) - self.data[i][0]) / (self.data[i][1] - self.data[i][0])
                     standard_number = (float(number) - self.data[i][2]) / self.data[i][3]
-                    normal_file.write("{0:.3f}".format(normal_number) + " ")
-                    standard_file.write("{0:.3f}".format(standard_number) + " ")
+                    normal_file.write("{0:.6f}".format(normal_number) + " ")
+                    standard_file.write("{0:.6f}".format(standard_number) + " ")
                     i += 1
                 else:
                     normal_file.write(str(number))
@@ -267,29 +269,92 @@ class PreProcess:
         standard_file.close()
         infile.close()
 
-    def format_file(self, filename):
+    @staticmethod
+    def get_filename_from_path(path):
+        return path.split(".")[0].split("\\")[-1]
+
+    def process_file(self, filename, process_function):
+        real_name = PreProcess.get_filename_from_path(filename)
+        middle_file = process_function(filename)
+        self.calculate_max_min_mean_deviation(middle_file)
+        self.norma_and_stand(middle_file, real_name)
+
+    @staticmethod
+    def format_pima(filename):
         infile = open(filename, "r")
-        middle_file = PreProcess.get_filename_from_path(filename) + "Intermediario.txt"
+        middle_file = "middle_files\\" + PreProcess.get_filename_from_path(filename) + "Intermediario.txt"
         outfile = open(middle_file, "w", newline="\n")
         for line in infile.readlines()[1:]:
             outfile.write(line)
         return middle_file
 
     @staticmethod
-    def get_filename_from_path(path):
-        return path.split(".")[0].split("\\")[-1]
+    def format_wine(filename):
+        infile = open(filename, "r")
+        middle_file = "middle_files\\" + PreProcess.get_filename_from_path(filename) + "Intermediario.txt"
+        outfile = open(middle_file, "w", newline="\n")
+        lines = infile.readlines()
+        for line in lines:
+            line = line.replace(",", " ")
+            line = line[:len(line) - 1] + " " + line[0]
+            line = line[1:]
+            outfile.write(line + "\n")
+        return middle_file
 
-    def process_file(self, filename):
-        real_name = PreProcess.get_filename_from_path(filename)
-        middle_file = self.format_file(filename)
-        self.calculate_max_min_mean_deviation(middle_file)
-        self.norma_and_stand(middle_file, real_name)
+    @staticmethod
+    def format_ionosphere(filename):
+        infile = open(filename, "r")
+        middle_file = "middle_files\\" + PreProcess.get_filename_from_path(filename) + "Intermediario.txt"
+        outfile = open(middle_file, "w", newline="\n")
+        lines = infile.readlines()
+        for line in lines:
+            line = line[:1] + line[3:]
+            line = line.replace(",", " ")
+            line = line[:-1]
+            if line[-1] == "g":
+                line = line[:-1]
+                line = line + "1"
+            else:
+                line = line[:-1]
+                line = line + "0"
+            outfile.write(line + "\n")
+        return middle_file
+
+    @staticmethod
+    def format_wdbc(filename):
+        infile = open(filename, "r")
+        if not os.path.exists("middle_files"):
+            os.mkdir("middle_files")
+        middle_file = "middle_files\\" + PreProcess.get_filename_from_path(filename) + "Intermediario.txt"
+        outfile = open(middle_file, "w", newline="\n")
+        lines = infile.readlines()
+        for line in lines:
+            line = line.replace(",", " ")
+            line = line[line.find(" ") + 1:len(line) - 1]
+            line = line[1:] + " " + line[0]
+            if line[-1] == "B":
+                line = line[:-1]
+                line = line + "0"
+            else:
+                line = line[:-1]
+                line = line + "1"
+            outfile.write(line + "\n")
+        return middle_file
 
 
 def main():
-    file = "C:\\Users\\tonia\\PycharmProjects\\NeuralNet\\data\\pima.tsv"
+    pima = "C:\\Users\\tonia\\PycharmProjects\\NeuralNet\\data\\pima.tsv"
+    wine = "C:\\Users\\tonia\\PycharmProjects\\NeuralNet\\data\\wine.data"
+    ionosphere = "C:\\Users\\tonia\\PycharmProjects\\NeuralNet\\data\\ionosphere.data"
+    wdbc = "C:\\Users\\tonia\\PycharmProjects\\NeuralNet\\data\\wdbc.data"
+    # processor = PreProcess()
+    # processor.process_file(pima, PreProcess.format_pima)
+    # processor = PreProcess()
+    # processor.process_file(wine, PreProcess.format_wine)
+    # processor = PreProcess()
+    # processor.process_file(ionosphere, PreProcess.format_ionosphere)
     processor = PreProcess()
-    processor.process_file(file)
+    processor.process_file(wdbc, PreProcess.format_wdbc)
 
 
 if __name__ == "__main__":
