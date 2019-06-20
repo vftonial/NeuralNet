@@ -4,6 +4,7 @@ import math
 import statistics
 import os
 
+
 # seu valor de ativacao, a lista de pesos que entram nele
 # casos especificos para o primeiro e ultimo layer
 class Node:
@@ -84,7 +85,8 @@ class NeuralNet:
         else:
             current_layer = self.hidden_layers[layer]
         previous_layer = self.hidden_layers[layer - 1]
-        return previous_layer[first_node].activation * current_layer[second_node].error + lamb * current_layer[second_node].weights[first_node]
+        return previous_layer[first_node].activation * current_layer[second_node].error + lamb * \
+               current_layer[second_node].weights[first_node]
 
     def adjust_weights(self, alpha, lamb):
         for layer_i in range(len(self.hidden_layers)):
@@ -136,12 +138,20 @@ class Problem:
     def read_normalized_file(self, filename):
         file = open(filename, "r")
         lines = file.readlines()
+        data = []
+        result = []
         for line in lines:
             line = line.split()
-            data = line[:-1]
-            result = line[-1]
-            instance = Instance(list(map(float, data)), list(map(float, result)))
+            data.append(line[:-1])
+            result.append(int(line[-1]))
+        out_number = max(result)
+        i = 0
+        for d in data:
+            result_list = [0 for _ in range(out_number + 1)]
+            result_list[result[i]] = 1
+            instance = Instance(list(map(float, d)), list(map(float, result_list)))
             self.instances.append(copy.deepcopy(instance))
+            i += 1
 
     def read_network(self, filename):
         layer = 0
@@ -355,10 +365,10 @@ class PreProcess:
 
 
 def main():
-    pima = "C:\\Users\\tonia\\PycharmProjects\\NeuralNet\\data\\pima.tsv"
-    wine = "C:\\Users\\tonia\\PycharmProjects\\NeuralNet\\data\\wine.data"
-    ionosphere = "C:\\Users\\tonia\\PycharmProjects\\NeuralNet\\data\\ionosphere.data"
-    wdbc = "C:\\Users\\tonia\\PycharmProjects\\NeuralNet\\data\\wdbc.data"
+    # pima = "C:\\Users\\tonia\\PycharmProjects\\NeuralNet\\data\\pima.tsv"
+    # wine = "C:\\Users\\tonia\\PycharmProjects\\NeuralNet\\data\\wine.data"
+    # ionosphere = "C:\\Users\\tonia\\PycharmProjects\\NeuralNet\\data\\ionosphere.data"
+    # wdbc = "C:\\Users\\tonia\\PycharmProjects\\NeuralNet\\data\\wdbc.data"
     # processor = PreProcess()
     # processor.process_file(pima, PreProcess.format_pima)
     # processor = PreProcess()
@@ -369,6 +379,9 @@ def main():
     # processor.process_file(wdbc, PreProcess.format_wdbc)
     # problem = Problem()
     # problem.read_normalized_file("normal_files\\wdbcNormalizado.txt")
+    problem = Problem()
+    problem.read_normalized_file("./normal_files/wdbcNormalizado.txt")
+    print(problem.instances[19].result)
 
 
 if __name__ == "__main__":
