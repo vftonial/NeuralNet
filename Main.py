@@ -48,7 +48,8 @@ class NeuralNet:
     def create_output_layer(self, n_weights, n_nodes):
         self.output_layer = self.create_layer(n_weights, n_nodes)
 
-    def create_layer(self, n_weights, n_nodes):
+    @staticmethod
+    def create_layer(n_weights, n_nodes):
         layer = []
         for _ in range(n_nodes):
             weights = list(random.uniform(0, 1) for _ in range(n_weights))
@@ -86,7 +87,7 @@ class NeuralNet:
             current_layer = self.hidden_layers[layer]
         previous_layer = self.hidden_layers[layer - 1]
         return (previous_layer[first_node].activation * current_layer[second_node].error) + (
-                    lamb * current_layer[second_node].weights[first_node])
+                lamb * current_layer[second_node].weights[first_node])
 
     def adjust_weights(self, alpha, lamb):
         for layer_i in range(len(self.hidden_layers)):
@@ -97,7 +98,7 @@ class NeuralNet:
                     grad = self.gradient(layer_i, weight_i, node_i, lamb)
                     node.weights[weight_i] = node.weights[weight_i] - alpha * grad
 
-    def cost(self, instances, lamb):
+    def cost(self, instances, lamb, all_weights):
         summ = 0
         for i in range(len(instances)):
             instance = instances[i]
@@ -106,17 +107,17 @@ class NeuralNet:
                 f = self.output_layer[k].activation
                 summ += -y * math.log(f) - (1 - y) * math.log(1 - f)
 
-        return (summ / len(instances)) + ((lamb * sum(self.get_all_weights())) / (2 * len(instances)))
+        return (summ / len(instances)) + ((lamb * sum(all_weights)) / (2 * len(instances)))
 
     def get_all_weights(self):
         weights = list()
         for layer in self.hidden_layers:
             for node in layer[1:]:
                 for w in node.weights[1:]:
-                    weigths.append(w)
+                    weights.append(w)
         for node in self.output_layer:
             for w in node.weights[1:]:
-                weigths.append(w)
+                weights.append(w)
         return weights
 
     def propagate_layer(self, from_layer, to_layer):
@@ -139,8 +140,33 @@ class NeuralNet:
     def propagate_output_layer(self):
         self.propagate_layer(self.hidden_layers[-1], self.output_layer)
 
-    def sigmoid(self, x):
+    @staticmethod
+    def sigmoid(x):
         return 1 / (1 + math.exp(- x))
+
+    def numeric_validation(self, instances, lamb, epsilon):
+        derivative_old = []
+        derivative_new = []
+        derivative_errors = []
+        for node in self.input_layer[1:]:
+            derivative_old.append(node.activation * node.error)
+
+        for layer in self.hidden_layers:
+            for node in layer[1:]:
+                derivative_old.append(node.activation * node.error)
+
+        for node in self.output_layer:
+            derivative_old.append(node.activation * node.error)
+
+        weights_eps_pos = self.get_all_weights()
+        for i in range(len(weights_eps_pos)):
+            weights_eps_neg = weights_eps_pos
+            weights_eps_neg[i] = weights_eps_pos[i] - epsilon
+            weights_eps_pos[i] = weights_eps_pos[i] + epsilon
+            d = (self.cost(instances, lamb, weights_eps_pos) - self.cost(instances, lamb, weights_eps_neg)) / 2*epsilon
+            derivative_new.append(d)
+            derivative_errors.append(derivative_old[i] - derivative_new[i])
+            weights_eps_pos = self.get_all_weights()
 
 
 class Problem:
@@ -231,45 +257,45 @@ class Problem:
                 self.neural_net.create_input_layer(instance.data)
                 self.propagate()
                 self.atualization(instance.result, alpha, lamb)
-            print(self.neural_net.cost(self.instances, lamb))
+            print(self.neural_net.cost(self.instances, lamb, self.neural_net.get_all_weights()))
 
-    @staticmethod
-    def cross_validation(instances, attributes, k, forest_size):
-        folds = Problem.create_folds(instances, k)
-        scores = list()
-        for i in range(0, k):
-            problem = Problem()
-            problem.attributes = copy.deepcopy(attributes)
-            problem.instances = list(folds[i]["training"])
-            problem.createForest(forestSize)
-            scores.append(problem.getPerformanceOfForest(folds[i]["test"]))
-
-    @staticmethod
-    def create_folds(instances, k):
-        size = len(instances)
-        fold_size = int(size / k)
-        rest_folds = size % k
-        fold_sizes = [fold_size for i in range(0, k)]
-        for i in range(0, rest_folds):
-            fold_sizes[i] += 1
-        instances = set(copy.deepcopy(instances))
-
-        folds = list()
-        for fSize in fold_sizes:
-            fold = set(random.sample(instances, fSize))
-            instances -= fold
-            folds.append(list(copy.deepcopy(fold)))
-
-        result = list()
-        for fold in folds:
-            index = folds.index(fold)
-            folds_list = copy.deepcopy(folds)
-            del folds_list[index]
-            fold_result = dict()
-            fold_result["training"] = sum(folds_list, [])
-            fold_result["test"] = copy.deepcopy(fold)
-            result.append(fold_result)
-        return result
+    # @staticmethod
+    # def cross_validation(instances, attributes, k, forest_size):
+    #     folds = Problem.create_folds(instances, k)
+    #     scores = list()
+    #     for i in range(0, k):
+    #         problem = Problem()
+    #         problem.attributes = copy.deepcopy(attributes)
+    #         problem.instances = list(folds[i]["training"])
+    #         problem.createForest(forestSize)
+    #         scores.append(problem.getPerformanceOfForest(folds[i]["test"]))
+    #
+    # @staticmethod
+    # def create_folds(instances, k):
+    #     size = len(instances)
+    #     fold_size = int(size / k)
+    #     rest_folds = size % k
+    #     fold_sizes = [fold_size for i in range(0, k)]
+    #     for i in range(0, rest_folds):
+    #         fold_sizes[i] += 1
+    #     instances = set(copy.deepcopy(instances))
+    #
+    #     folds = list()
+    #     for fSize in fold_sizes:
+    #         fold = set(random.sample(instances, fSize))
+    #         instances -= fold
+    #         folds.append(list(copy.deepcopy(fold)))
+    #
+    #     result = list()
+    #     for fold in folds:
+    #         index = folds.index(fold)
+    #         folds_list = copy.deepcopy(folds)
+    #         del folds_list[index]
+    #         fold_result = dict()
+    #         fold_result["training"] = sum(folds_list, [])
+    #         fold_result["test"] = copy.deepcopy(fold)
+    #         result.append(fold_result)
+    #     return result
 
     def propagate(self):
         self.neural_net.propagate_input_layer()
@@ -419,17 +445,16 @@ def main():
     wine = "./data/wine.data"
     ionosphere = "./data/ionosphere.data"
     wdbc = "./data/wdbc.data"
-    # processor = PreProcess()
-    # processor.process_file(pima, PreProcess.format_pima)
-    # processor = PreProcess()
-    # processor.process_file(wine, PreProcess.format_wine)
-    # processor = PreProcess()
-    # processor.process_file(ionosphere, PreProcess.format_ionosphere)
+    processor = PreProcess()
+    processor.process_file(pima, PreProcess.format_pima)
+    processor = PreProcess()
+    processor.process_file(wine, PreProcess.format_wine)
+    processor = PreProcess()
+    processor.process_file(ionosphere, PreProcess.format_ionosphere)
     processor = PreProcess()
     processor.process_file(wdbc, PreProcess.format_wdbc)
     problem = Problem()
     problem.read_normalized_file("./normal_files/wdbcNormalizado.txt")
-    print(problem.instances[19].result)
 
 
 if __name__ == "__main__":
