@@ -38,11 +38,11 @@ class NeuralNet:
 
     def create_hidden_layers(self, input_size, n_nodes, n_layers):
         # adicionar o primeiro layer com base no conjunto de entradas
-        first_layer = self.create_layer(input_size, n_nodes)
+        first_layer = self.create_layer(input_size, n_nodes[0])
         self.hidden_layers.append(first_layer)
         # adicionar os hidden layers
-        for _ in n_layers - 1:
-            hidden_layer = self.create_layer(n_nodes, n_nodes)
+        for i in range(1, n_layers):
+            hidden_layer = self.create_layer(n_nodes, n_nodes[i])
             self.hidden_layers.append(hidden_layer)
 
     def create_output_layer(self, n_weights, n_nodes):
@@ -77,7 +77,7 @@ class NeuralNet:
         self.output_layer_errors(expected_result)
         self.hidden_layer_errors(len(self.hidden_layers) - 1, self.output_layer)
 
-    def gradient(self, layer, first_node, second_node, lamb):  # MAYBE ITS WRONG
+    def gradient(self, layer, first_node, second_node, lamb):
         if first_node == 0:
             lamb = 0
         if layer == len(self.hidden_layers):
@@ -85,8 +85,7 @@ class NeuralNet:
         else:
             current_layer = self.hidden_layers[layer]
         previous_layer = self.hidden_layers[layer - 1]
-        return previous_layer[first_node].activation * current_layer[second_node].error + lamb * \
-               current_layer[second_node].weights[first_node]
+        return (previous_layer[first_node].activation * current_layer[second_node].error) + (lamb * current_layer[second_node].weights[first_node])
 
     def adjust_weights(self, alpha, lamb):
         for layer_i in range(len(self.hidden_layers)):
@@ -97,7 +96,7 @@ class NeuralNet:
                     grad = self.gradient(layer_i, weight_i, node_i, lamb)
                     node.weights[weight_i] = node.weights[weight_i] - alpha * grad
 
-    def cost(self, instances):
+    def cost(self, instances, lamb):
         summ = 0
         for i in range(len(instances)):
             instance = instances[i]
@@ -105,7 +104,19 @@ class NeuralNet:
                 y = instance.result[k]
                 f = self.output_layer[k].activation
                 summ += -y * math.log(f) - (1 - y) * math.log(1 - f)
-        return summ / len(instances)
+
+        return (summ / len(instances)) + ((lamb * sum(self.get_all_weights())) / (2 * len(instances)))
+
+    def get_all_weights(self):
+    	weights = list()
+    	for layer in self.hidden_layers:
+        	for node in layer[1:]:
+        		for w in node.weights[1:]:
+        			weigths.append(w)
+        for node in self.output_layer:
+    		for w in node.weights[1:]:
+    			weigths.append(w)
+    	return weights
 
     def propagate_layer(self, from_layer, to_layer):
         for to_node in to_layer[1:]:
@@ -113,7 +124,7 @@ class NeuralNet:
             for from_node_index in range(len(from_layer)):
                 from_node = from_layer[from_node_index]
                 to_node.activation += from_node.activation * to_node.weights[from_node_index]
-                to_node.activation = self.sigmoid(to_node.activation)
+            to_node.activation = self.sigmoid(to_node.activation)
 
     def propagate_input_layer(self):
         self.propagate_layer(self.input_layer, self.hidden_layers[0])
@@ -133,6 +144,8 @@ class NeuralNet:
 
 class Problem:
     instances = []
+    training = []
+    test = []
     neural_net = NeuralNet()
 
     def read_normalized_file(self, filename):
@@ -202,16 +215,7 @@ class Problem:
             instance = Instance(list(map(float, data)), list(map(float, result)))
             self.instances.append(copy.deepcopy(instance))
 
-    def backpropagation(self, n_layers, n_nodes):
-        # inicializar os pesos da rede com não zero
-        # para cada exemplo no treinamento
-        #   propagar o exemplo na rede
-        #   calcular o erro na camada de saida
-        #   calcular os erros da camada oculta
-        #   calcular os gradiantes
-        #   ajustar os pesos
-        # avaliar a performance no conjunto de treinamento, se ainda não ta decente roda dnv
-
+    def backpropagation(self, n_layers, n_nodes, alpha, lamb):
         size_input_layer = len(self.instances[0].data)
         size_output_layer = len(self.instances[0].result)
 
@@ -221,20 +225,57 @@ class Problem:
         # adicionar o ultimo layer com base no conjunto de entradas
         self.neural_net.create_output_layer(n_nodes, size_output_layer)
 
-        for instance in self.instances:
-            self.neural_net.create_input_layer(instance.data)
-            self.propagate()
-            # comparar o valor de ativaçao do nodo de saida com o valor previsto na instancia e atualizar o seu peso
-            self.atualization(instance.result)
+        for _ in range(20):
+	        for instance in self.instances:
+	            self.neural_net.create_input_layer(instance.data)
+	            self.propagate()
+	            self.atualization(instance.result, alpha, lamb)
+	        print(self.neural_net.cost(instances, lamb))
+
+	def cross_validation(instances, attributes, k, forest_size):
+		folds = Problem.create_folds(instances, k)
+		scores = list()
+		for i in range(0, k):
+			problem = Problem()
+			problem.attributes = copy.deepcopy(attributes)
+			problem.instances = list(folds[i]["training"])
+			problem.createForest(forestSize)
+			scores.append(problem.getPerformanceOfForest(folds[i]["test"]))
+
+	def create_folds(instances, k):
+		size = len(instances)
+		foldSize = int(size / k)
+		restFolds = size % k
+		foldSizes = [foldSize for i in range(0, k)]
+		for i in range(0, restFolds):
+			foldSizes[i] += 1
+		instances = set(copy.deepcopy(instances))
+
+		folds = list()
+		for fSize in foldSizes:
+			fold = set(random.sample(instances, fSize))
+			instances -= fold
+			folds.append(list(copy.deepcopy(fold)))
+
+		result = list()
+		for fold in folds:
+			index = folds.index(fold)
+			foldsList = copy.deepcopy(folds)
+			del foldsList[index]
+			foldResult = dict()
+			foldResult["training"] = sum(foldsList, [])
+			foldResult["test"] = copy.deepcopy(fold)
+			result.append(foldResult)
+		return result
 
     def propagate(self):
         self.neural_net.propagate_input_layer()
         self.neural_net.propagate_hidden_layers()
         self.neural_net.propagate_output_layer()
 
-    def atualization(self, expected_result):
+    def atualization(self, expected_result, alpha, lamb):
         self.neural_net.all_layers_errors(expected_result)
-        self.neural_net.adjust_weights(0.9)
+        self.neural_net.adjust_weights(alpha, lamb)
 
 
 class PreProcess:
@@ -293,7 +334,7 @@ class PreProcess:
 
     @staticmethod
     def get_filename_from_path(path):
-        return path.split(".")[0].split("\\")[-1]
+        return path.split(".")[0].split("/")[-1]
 
     def process_file(self, filename, process_function):
         real_name = PreProcess.get_filename_from_path(filename)
@@ -304,6 +345,8 @@ class PreProcess:
     @staticmethod
     def format_pima(filename):
         infile = open(filename, "r")
+        if not os.path.exists("middle_files"):
+            os.mkdir("middle_files")
         middle_file = "middle_files\\" + PreProcess.get_filename_from_path(filename) + "Intermediario.txt"
         outfile = open(middle_file, "w", newline="\n")
         for line in infile.readlines()[1:]:
@@ -313,6 +356,8 @@ class PreProcess:
     @staticmethod
     def format_wine(filename):
         infile = open(filename, "r")
+        if not os.path.exists("middle_files"):
+            os.mkdir("middle_files")
         middle_file = "middle_files\\" + PreProcess.get_filename_from_path(filename) + "Intermediario.txt"
         outfile = open(middle_file, "w", newline="\n")
         lines = infile.readlines()
@@ -326,6 +371,8 @@ class PreProcess:
     @staticmethod
     def format_ionosphere(filename):
         infile = open(filename, "r")
+        if not os.path.exists("middle_files"):
+            os.mkdir("middle_files")
         middle_file = "middle_files\\" + PreProcess.get_filename_from_path(filename) + "Intermediario.txt"
         outfile = open(middle_file, "w", newline="\n")
         lines = infile.readlines()
@@ -365,10 +412,10 @@ class PreProcess:
 
 
 def main():
-    # pima = "C:\\Users\\tonia\\PycharmProjects\\NeuralNet\\data\\pima.tsv"
-    # wine = "C:\\Users\\tonia\\PycharmProjects\\NeuralNet\\data\\wine.data"
-    # ionosphere = "C:\\Users\\tonia\\PycharmProjects\\NeuralNet\\data\\ionosphere.data"
-    # wdbc = "C:\\Users\\tonia\\PycharmProjects\\NeuralNet\\data\\wdbc.data"
+    pima = "./data/pima.tsv"
+    wine = "./data/wine.data"
+    ionosphere = "./data/ionosphere.data"
+    wdbc = "./data/wdbc.data"
     # processor = PreProcess()
     # processor.process_file(pima, PreProcess.format_pima)
     # processor = PreProcess()
