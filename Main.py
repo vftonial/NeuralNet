@@ -85,7 +85,8 @@ class NeuralNet:
         else:
             current_layer = self.hidden_layers[layer]
         previous_layer = self.hidden_layers[layer - 1]
-        return (previous_layer[first_node].activation * current_layer[second_node].error) + (lamb * current_layer[second_node].weights[first_node])
+        return (previous_layer[first_node].activation * current_layer[second_node].error) + (
+                    lamb * current_layer[second_node].weights[first_node])
 
     def adjust_weights(self, alpha, lamb):
         for layer_i in range(len(self.hidden_layers)):
@@ -108,15 +109,15 @@ class NeuralNet:
         return (summ / len(instances)) + ((lamb * sum(self.get_all_weights())) / (2 * len(instances)))
 
     def get_all_weights(self):
-    	weights = list()
-    	for layer in self.hidden_layers:
-        	for node in layer[1:]:
-        		for w in node.weights[1:]:
-        			weigths.append(w)
+        weights = list()
+        for layer in self.hidden_layers:
+            for node in layer[1:]:
+                for w in node.weights[1:]:
+                    weigths.append(w)
         for node in self.output_layer:
-    		for w in node.weights[1:]:
-    			weigths.append(w)
-    	return weights
+            for w in node.weights[1:]:
+                weigths.append(w)
+        return weights
 
     def propagate_layer(self, from_layer, to_layer):
         for to_node in to_layer[1:]:
@@ -226,47 +227,49 @@ class Problem:
         self.neural_net.create_output_layer(n_nodes, size_output_layer)
 
         for _ in range(20):
-	        for instance in self.instances:
-	            self.neural_net.create_input_layer(instance.data)
-	            self.propagate()
-	            self.atualization(instance.result, alpha, lamb)
-	        print(self.neural_net.cost(instances, lamb))
+            for instance in self.instances:
+                self.neural_net.create_input_layer(instance.data)
+                self.propagate()
+                self.atualization(instance.result, alpha, lamb)
+            print(self.neural_net.cost(self.instances, lamb))
 
-	def cross_validation(instances, attributes, k, forest_size):
-		folds = Problem.create_folds(instances, k)
-		scores = list()
-		for i in range(0, k):
-			problem = Problem()
-			problem.attributes = copy.deepcopy(attributes)
-			problem.instances = list(folds[i]["training"])
-			problem.createForest(forestSize)
-			scores.append(problem.getPerformanceOfForest(folds[i]["test"]))
+    @staticmethod
+    def cross_validation(instances, attributes, k, forest_size):
+        folds = Problem.create_folds(instances, k)
+        scores = list()
+        for i in range(0, k):
+            problem = Problem()
+            problem.attributes = copy.deepcopy(attributes)
+            problem.instances = list(folds[i]["training"])
+            problem.createForest(forestSize)
+            scores.append(problem.getPerformanceOfForest(folds[i]["test"]))
 
-	def create_folds(instances, k):
-		size = len(instances)
-		foldSize = int(size / k)
-		restFolds = size % k
-		foldSizes = [foldSize for i in range(0, k)]
-		for i in range(0, restFolds):
-			foldSizes[i] += 1
-		instances = set(copy.deepcopy(instances))
+    @staticmethod
+    def create_folds(instances, k):
+        size = len(instances)
+        fold_size = int(size / k)
+        rest_folds = size % k
+        fold_sizes = [fold_size for i in range(0, k)]
+        for i in range(0, rest_folds):
+            fold_sizes[i] += 1
+        instances = set(copy.deepcopy(instances))
 
-		folds = list()
-		for fSize in foldSizes:
-			fold = set(random.sample(instances, fSize))
-			instances -= fold
-			folds.append(list(copy.deepcopy(fold)))
+        folds = list()
+        for fSize in fold_sizes:
+            fold = set(random.sample(instances, fSize))
+            instances -= fold
+            folds.append(list(copy.deepcopy(fold)))
 
-		result = list()
-		for fold in folds:
-			index = folds.index(fold)
-			foldsList = copy.deepcopy(folds)
-			del foldsList[index]
-			foldResult = dict()
-			foldResult["training"] = sum(foldsList, [])
-			foldResult["test"] = copy.deepcopy(fold)
-			result.append(foldResult)
-		return result
+        result = list()
+        for fold in folds:
+            index = folds.index(fold)
+            folds_list = copy.deepcopy(folds)
+            del folds_list[index]
+            fold_result = dict()
+            fold_result["training"] = sum(folds_list, [])
+            fold_result["test"] = copy.deepcopy(fold)
+            result.append(fold_result)
+        return result
 
     def propagate(self):
         self.neural_net.propagate_input_layer()
@@ -334,7 +337,7 @@ class PreProcess:
 
     @staticmethod
     def get_filename_from_path(path):
-        return path.split(".")[0].split("/")[-1]
+        return path.split(".")[1].split("/")[-1]
 
     def process_file(self, filename, process_function):
         real_name = PreProcess.get_filename_from_path(filename)
@@ -347,7 +350,7 @@ class PreProcess:
         infile = open(filename, "r")
         if not os.path.exists("middle_files"):
             os.mkdir("middle_files")
-        middle_file = "middle_files\\" + PreProcess.get_filename_from_path(filename) + "Intermediario.txt"
+        middle_file = "middle_files/" + PreProcess.get_filename_from_path(filename) + "Intermediario.txt"
         outfile = open(middle_file, "w", newline="\n")
         for line in infile.readlines()[1:]:
             outfile.write(line)
@@ -358,7 +361,7 @@ class PreProcess:
         infile = open(filename, "r")
         if not os.path.exists("middle_files"):
             os.mkdir("middle_files")
-        middle_file = "middle_files\\" + PreProcess.get_filename_from_path(filename) + "Intermediario.txt"
+        middle_file = "middle_files/" + PreProcess.get_filename_from_path(filename) + "Intermediario.txt"
         outfile = open(middle_file, "w", newline="\n")
         lines = infile.readlines()
         for line in lines:
@@ -373,7 +376,7 @@ class PreProcess:
         infile = open(filename, "r")
         if not os.path.exists("middle_files"):
             os.mkdir("middle_files")
-        middle_file = "middle_files\\" + PreProcess.get_filename_from_path(filename) + "Intermediario.txt"
+        middle_file = "middle_files/" + PreProcess.get_filename_from_path(filename) + "Intermediario.txt"
         outfile = open(middle_file, "w", newline="\n")
         lines = infile.readlines()
         for line in lines:
@@ -394,7 +397,7 @@ class PreProcess:
         infile = open(filename, "r")
         if not os.path.exists("middle_files"):
             os.mkdir("middle_files")
-        middle_file = "middle_files\\" + PreProcess.get_filename_from_path(filename) + "Intermediario.txt"
+        middle_file = "middle_files/" + PreProcess.get_filename_from_path(filename) + "Intermediario.txt"
         outfile = open(middle_file, "w", newline="\n")
         lines = infile.readlines()
         for line in lines:
@@ -422,10 +425,8 @@ def main():
     # processor.process_file(wine, PreProcess.format_wine)
     # processor = PreProcess()
     # processor.process_file(ionosphere, PreProcess.format_ionosphere)
-    # processor = PreProcess()
-    # processor.process_file(wdbc, PreProcess.format_wdbc)
-    # problem = Problem()
-    # problem.read_normalized_file("normal_files\\wdbcNormalizado.txt")
+    processor = PreProcess()
+    processor.process_file(wdbc, PreProcess.format_wdbc)
     problem = Problem()
     problem.read_normalized_file("./normal_files/wdbcNormalizado.txt")
     print(problem.instances[19].result)
