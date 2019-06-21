@@ -153,29 +153,29 @@ class NeuralNet:
 	def sigmoid(self, x):
 		return 1 / (1 + math.exp(- x))
 
-    def numeric_validation(self, instances, lamb, epsilon):
-        derivative_old = []
-        derivative_new = []
-        derivative_errors = []
-        for node in self.input_layer[1:]:
-            derivative_old.append(node.activation * node.error)
+	def numeric_validation(self, instances, lamb, epsilon):
+		derivative_old = []
+		derivative_new = []
+		derivative_errors = []
+		for node in self.input_layer[1:]:
+			derivative_old.append(node.activation * node.error)
 
-        for layer in self.hidden_layers:
-            for node in layer[1:]:
-                derivative_old.append(node.activation * node.error)
+		for layer in self.hidden_layers:
+			for node in layer[1:]:
+				derivative_old.append(node.activation * node.error)
 
-        for node in self.output_layer:
-            derivative_old.append(node.activation * node.error)
+		for node in self.output_layer:
+			derivative_old.append(node.activation * node.error)
 
-        weights_eps_pos = self.get_all_weights()
-        for i in range(len(weights_eps_pos)):
-            weights_eps_neg = weights_eps_pos
-            weights_eps_neg[i] = weights_eps_pos[i] - epsilon
-            weights_eps_pos[i] = weights_eps_pos[i] + epsilon
-            d = (self.cost(instances, lamb, weights_eps_pos) - self.cost(instances, lamb, weights_eps_neg)) / 2*epsilon
-            derivative_new.append(d)
-            derivative_errors.append(derivative_old[i] - derivative_new[i])
-            weights_eps_pos = self.get_all_weights()
+		weights_eps_pos = self.get_all_weights()
+		for i in range(len(weights_eps_pos)):
+			weights_eps_neg = weights_eps_pos
+			weights_eps_neg[i] = weights_eps_pos[i] - epsilon
+			weights_eps_pos[i] = weights_eps_pos[i] + epsilon
+			d = (self.cost(instances, lamb, weights_eps_pos) - self.cost(instances, lamb, weights_eps_neg)) / 2*epsilon
+			derivative_new.append(d)
+			derivative_errors.append(derivative_old[i] - derivative_new[i])
+			weights_eps_pos = self.get_all_weights()
 
 
 class Problem:
