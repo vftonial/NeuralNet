@@ -445,8 +445,8 @@ def main():
     wine = "./data/wine.data"
     ionosphere = "./data/ionosphere.data"
     wdbc = "./data/wdbc.data"
-    processor = PreProcess()
-    processor.process_file(pima, PreProcess.format_pima)
+    # processor = PreProcess()
+    # processor.process_file(pima, PreProcess.format_pima)
     processor = PreProcess()
     processor.process_file(wine, PreProcess.format_wine)
     processor = PreProcess()
