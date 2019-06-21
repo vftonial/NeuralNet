@@ -197,9 +197,11 @@ class Problem:
 	test = []
 	output_size = 0
 	neural_net = NeuralNet()
+	file_name = ""
 
 	def read_normalized_file(self, filename):
 		file = open(filename, "r")
+		self.file_name = filename.split("/")[2].split("Normalizado")[0]
 		lines = file.readlines()
 		data = []
 		result = []
@@ -279,8 +281,18 @@ class Problem:
 				self.neural_net.create_input_layer(instance.data)
 				self.propagate()
 				self.atualization(instance.result, alpha, lamb)
-			print(self.neural_net.cost(self.instances, lamb, self.neural_net.get_all_weights()))
+			j = self.neural_net.cost(self.instances, lamb, self.neural_net.get_all_weights())
+			self.save_results(j, alpha, lamb, self.file_name)
 		print(self.neural_net.numeric_validation(self.instances, lamb, 0.00000005))
+
+	@staticmethod
+	def save_results(j, alpha, lamb, filename):
+		if not os.path.exists("results"):
+			os.mkdir("results")
+		file = open("results/" + filename + "Results.txt", "a", newline="\n")
+		line = str(j) + " " + str(alpha) + " " + str(lamb) + "\n"
+		file.write(line)
+		file.close()
 
 	# def cross_validation(instances, attributes, k, forest_size):
 	#     folds = Problem.create_folds(instances, k)
