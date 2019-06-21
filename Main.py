@@ -64,13 +64,14 @@ class NeuralNet:
 			self.output_layer[index].error = f - y
 
 	def hidden_layer_errors(self, from_layer_i, to_layer_i):
-		if(from_layer_i > 0):
+		if from_layer_i > 0:
 			from_layer = self.hidden_layers[from_layer_i]
 			to_layer = self.hidden_layers[to_layer_i]
 			self.layer_errors(from_layer, to_layer)
 			self.hidden_layer_errors(to_layer_i, to_layer_i - 1)
 
-	def layer_errors(self, from_layer, to_layer):
+	@staticmethod
+	def layer_errors(from_layer, to_layer):
 		for node_i in range(1, len(to_layer)):
 			from_layer_size = len(from_layer)
 			weights_x_error = list(
@@ -83,7 +84,8 @@ class NeuralNet:
 		self.layer_errors(self.output_layer, self.hidden_layers[-1])
 		self.hidden_layer_errors(len(self.hidden_layers) - 1, len(self.hidden_layers) - 2)
 
-	def gradient(self, from_layer, to_layer, first_node, second_node, lamb):
+	@staticmethod
+	def gradient(from_layer, to_layer, first_node, second_node, lamb):
 		if first_node == 0:
 			lamb = 0
 		return (from_layer[first_node].activation * to_layer[second_node].error) + (lamb * to_layer[second_node].weights[first_node])
@@ -150,7 +152,7 @@ class NeuralNet:
 		self.propagate_layer(self.hidden_layers[-1], self.output_layer)
 
 	@staticmethod
-	def sigmoid(self, x):
+	def sigmoid(x):
 		return 1 / (1 + math.exp(- x))
 
 	def numeric_validation(self, instances, lamb, epsilon):
