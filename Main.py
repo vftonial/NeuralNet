@@ -11,10 +11,12 @@ class Node:
 	activation = 0
 	weights = None
 	error = 0
+	grads = None
 
-	def __init__(self, activation, weights=None):
+	def __init__(self, activation, weights=None, grads=None):
 		self.activation = activation
 		self.weights = weights
+		self.grads = grads
 
 
 class Instance:
@@ -34,6 +36,7 @@ class NeuralNet:
 
 	def create_input_layer(self, activation_list):
 		self.input_layer = list()
+		self.input_layer.append(Node(1))
 		for x in activation_list:
 			self.input_layer.append(Node(x))
 
@@ -47,14 +50,16 @@ class NeuralNet:
 			self.hidden_layers.append(hidden_layer)
 
 	def create_output_layer(self, n_weights, n_nodes):
-		self.output_layer = self.create_layer(n_weights, n_nodes)
+		self.output_layer = self.create_layer(n_weights, n_nodes)[1:]
 
 	@staticmethod
 	def create_layer(n_weights, n_nodes):
 		layer = []
+		layer.append(Node(1))
 		for _ in range(n_nodes):
-			weights = list(random.uniform(0, 1) for _ in range(n_weights))
-			layer.append(Node(0, weights))
+			weights = list(random.uniform(0, 1) for _ in range(n_weights + 1))
+			grads = list(0 for _ in range(n_weights + 1))
+			layer.append(Node(0, weights, grads))
 		return layer
 
 	def output_layer_errors(self, expected_result):
@@ -64,14 +69,13 @@ class NeuralNet:
 			self.output_layer[index].error = f - y
 
 	def hidden_layer_errors(self, from_layer_i, to_layer_i):
-		if from_layer_i > 0:
+		if(from_layer_i > 0):
 			from_layer = self.hidden_layers[from_layer_i]
 			to_layer = self.hidden_layers[to_layer_i]
 			self.layer_errors(from_layer, to_layer)
 			self.hidden_layer_errors(to_layer_i, to_layer_i - 1)
 
-	@staticmethod
-	def layer_errors(from_layer, to_layer):
+	def layer_errors(self, from_layer, to_layer):
 		for node_i in range(1, len(to_layer)):
 			from_layer_size = len(from_layer)
 			weights_x_error = list(
@@ -84,8 +88,7 @@ class NeuralNet:
 		self.layer_errors(self.output_layer, self.hidden_layers[-1])
 		self.hidden_layer_errors(len(self.hidden_layers) - 1, len(self.hidden_layers) - 2)
 
-	@staticmethod
-	def gradient(from_layer, to_layer, first_node, second_node, lamb):
+	def gradient(self, from_layer, to_layer, first_node, second_node, lamb):
 		if first_node == 0:
 			lamb = 0
 		return (from_layer[first_node].activation * to_layer[second_node].error) + (lamb * to_layer[second_node].weights[first_node])
@@ -99,13 +102,14 @@ class NeuralNet:
 		self.adjust_weights_of_layer(alpha, lamb, self.hidden_layers[-1], self.output_layer)
 
 	def adjust_weights_of_layer(self, alpha, lamb, from_layer, to_layer):
-		for node_i in range(len(to_layer)):
+		for node_i in range(1, len(to_layer)):
 			node = to_layer[node_i]
 			self.adjust_weights_of_node(alpha, lamb, node, node_i, from_layer, to_layer)
 
 	def adjust_weights_of_node(self, alpha, lamb, node, node_i, from_layer, to_layer):
 		for weight_i in range(len(node.weights)):
 			grad = self.gradient(from_layer, to_layer, weight_i, node_i, lamb)
+			node.grads[weight_i] = grad
 			node.weights[weight_i] = node.weights[weight_i] - alpha * grad
 
 	def cost(self, instances, lamb, all_weights):
@@ -115,8 +119,8 @@ class NeuralNet:
 			for k in range(len(instance.result)):
 				y = instance.result[k]
 				f = float(self.output_layer[k].activation)
-				ln_f = -7 if f == 0 else math.log(f)
-				ln_1f = -7 if f == 1 else math.log(1.0 - f)
+				ln_f = -10 if f == 0 else math.log(f)
+				ln_1f = -10 if f == 1 else math.log(1.0 - f)
 				summer += -y * ln_f - (1.0 - y) * ln_1f
 		return (summer / len(instances)) + ((lamb * sum(all_weights)) / (2.0 * len(instances)))
 
@@ -149,25 +153,31 @@ class NeuralNet:
 			self.propagate_layer(from_layer, to_layer)
 
 	def propagate_output_layer(self):
-		self.propagate_layer(self.hidden_layers[-1], self.output_layer)
+		to_layer = self.output_layer
+		from_layer = self.hidden_layers[-1]
+		for to_node in to_layer:
+			to_node.activation = 0
+			for from_node_index in range(len(from_layer)):
+				from_node = from_layer[from_node_index]
+				to_node.activation += from_node.activation * to_node.weights[from_node_index]
+			to_node.activation = self.sigmoid(to_node.activation)
 
 	@staticmethod
 	def sigmoid(x):
 		return 1 / (1 + math.exp(- x))
 
 	def numeric_validation(self, instances, lamb, epsilon):
-		derivative_old = []
-		derivative_new = []
+		neuralnet_gradients = []
+		derivative_cost = []
 		derivative_errors = []
-		for node in self.input_layer[1:]:
-			derivative_old.append(node.activation * node.error)
 
 		for layer in self.hidden_layers:
 			for node in layer[1:]:
-				derivative_old.append(node.activation * node.error)
-
+				for grad in node.grads[1:]:
+					neuralnet_gradients.append(grad)
 		for node in self.output_layer:
-			derivative_old.append(node.activation * node.error)
+			for grad in node.grads[1:]:
+				neuralnet_gradients.append(grad)
 
 		weights_eps_pos = self.get_all_weights()
 		for i in range(len(weights_eps_pos)):
@@ -175,9 +185,10 @@ class NeuralNet:
 			weights_eps_neg[i] = weights_eps_pos[i] - epsilon
 			weights_eps_pos[i] = weights_eps_pos[i] + epsilon
 			d = (self.cost(instances, lamb, weights_eps_pos) - self.cost(instances, lamb, weights_eps_neg)) / 2*epsilon
-			derivative_new.append(d)
-			derivative_errors.append(derivative_old[i] - derivative_new[i])
+			derivative_cost.append(d)
+			derivative_errors.append(neuralnet_gradients[i] - derivative_cost[i])
 			weights_eps_pos = self.get_all_weights()
+		return derivative_errors
 
 
 class Problem:
@@ -269,6 +280,7 @@ class Problem:
 				self.propagate()
 				self.atualization(instance.result, alpha, lamb)
 			print(self.neural_net.cost(self.instances, lamb, self.neural_net.get_all_weights()))
+		print(self.neural_net.numeric_validation(self.instances, lamb, 0.00000005))
 
 	# def cross_validation(instances, attributes, k, forest_size):
 	#     folds = Problem.create_folds(instances, k)
@@ -465,7 +477,6 @@ def main():
 	problem = Problem()
 	problem.read_normalized_file("./normal_files/wdbcNormalizado.txt")
 	problem.backpropagation(4, [3, 2, 3, 2], 0.3, 0.0003)
-	print(problem.instances[19].result)
 
 
 if __name__ == "__main__":
