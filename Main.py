@@ -50,7 +50,7 @@ class NeuralNet:
 		self.output_layer = self.create_layer(n_weights, n_nodes)
 
 	@staticmethod
-	def create_layer(self, n_weights, n_nodes):
+	def create_layer(n_weights, n_nodes):
 		layer = []
 		for _ in range(n_nodes):
 			weights = list(random.uniform(0, 1) for _ in range(n_weights))
@@ -89,25 +89,25 @@ class NeuralNet:
 		return (from_layer[first_node].activation * to_layer[second_node].error) + (lamb * to_layer[second_node].weights[first_node])
 
 	def adjust_weights(self, alpha, lamb):
-		self.ajust_weights_of_layer(alpha, lamb, self.input_layer, self.hidden_layers[0])
+		self.adjust_weights_of_layer(alpha, lamb, self.input_layer, self.hidden_layers[0])
 		for layer_i in range(1, len(self.hidden_layers) - 1):
 			to_layer = self.hidden_layers[layer_i + 1]
 			from_layer = self.hidden_layers[layer_i]
-			self.ajust_weights_of_layer(alpha, lamb, from_layer, to_layer)
-		self.ajust_weights_of_layer(alpha, lamb, self.hidden_layers[-1], self.output_layer)
+			self.adjust_weights_of_layer(alpha, lamb, from_layer, to_layer)
+		self.adjust_weights_of_layer(alpha, lamb, self.hidden_layers[-1], self.output_layer)
 
-	def ajust_weights_of_layer(self, alpha, lamb, from_layer, to_layer):
+	def adjust_weights_of_layer(self, alpha, lamb, from_layer, to_layer):
 		for node_i in range(len(to_layer)):
 			node = to_layer[node_i]
-			self.ajust_weights_of_node(alpha, lamb, node, node_i, from_layer, to_layer)
+			self.adjust_weights_of_node(alpha, lamb, node, node_i, from_layer, to_layer)
 
-	def ajust_weights_of_node(self, alpha, lamb, node, node_i, from_layer, to_layer):
+	def adjust_weights_of_node(self, alpha, lamb, node, node_i, from_layer, to_layer):
 		for weight_i in range(len(node.weights)):
 			grad = self.gradient(from_layer, to_layer, weight_i, node_i, lamb)
 			node.weights[weight_i] = node.weights[weight_i] - alpha * grad
 
 	def cost(self, instances, lamb, all_weights):
-		summ = 0.0
+		summer = 0.0
 		for i in range(len(instances)):
 			instance = instances[i]
 			for k in range(len(instance.result)):
@@ -115,8 +115,8 @@ class NeuralNet:
 				f = float(self.output_layer[k].activation)
 				ln_f = -7 if f == 0 else math.log(f)
 				ln_1f = -7 if f == 1 else math.log(1.0 - f)
-				summ += -y * ln_f - (1.0 - y) * ln_1f
-		return (summ / len(instances)) + ((lamb * sum(all_weights)) / (2.0 * len(instances)))
+				summer += -y * ln_f - (1.0 - y) * ln_1f
+		return (summer / len(instances)) + ((lamb * sum(all_weights)) / (2.0 * len(instances)))
 
 	def get_all_weights(self):
 		weights = list()
