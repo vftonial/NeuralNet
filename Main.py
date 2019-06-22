@@ -70,7 +70,7 @@ class NeuralNet:
 			self.output_layer[index].error = f - y
 
 	def hidden_layer_errors(self, from_layer_i, to_layer_i):
-		if(from_layer_i > 0):
+		if (from_layer_i > 0):
 			from_layer = self.hidden_layers[from_layer_i]
 			to_layer = self.hidden_layers[to_layer_i]
 			self.layer_errors(from_layer, to_layer)
@@ -92,7 +92,8 @@ class NeuralNet:
 	def gradient(self, from_layer, to_layer, first_node, second_node, lamb):
 		if first_node == 0:
 			lamb = 0
-		return (from_layer[first_node].activation * to_layer[second_node].error) + (lamb * to_layer[second_node].weights[first_node])
+		return (from_layer[first_node].activation * to_layer[second_node].error) + (
+				lamb * to_layer[second_node].weights[first_node])
 
 	def adjust_weights(self, alpha, lamb):
 		self.adjust_weights_of_layer(alpha, lamb, self.input_layer, self.hidden_layers[0])
@@ -185,7 +186,8 @@ class NeuralNet:
 			weights_eps_neg = weights_eps_pos
 			weights_eps_neg[i] = weights_eps_pos[i] - epsilon
 			weights_eps_pos[i] = weights_eps_pos[i] + epsilon
-			d = (self.cost(instances, lamb, weights_eps_pos) - self.cost(instances, lamb, weights_eps_neg)) / 2*epsilon
+			d = (self.cost(instances, lamb, weights_eps_pos) - self.cost(instances, lamb,
+			                                                             weights_eps_neg)) / 2 * epsilon
 			derivative_cost.append(d)
 			derivative_errors.append(neuralnet_gradients[i] - derivative_cost[i])
 			weights_eps_pos = self.get_all_weights()
@@ -277,21 +279,22 @@ class Problem:
 		# adicionar o ultimo layer com base no conjunto de entradas
 		self.neural_net.create_output_layer(n_nodes[-1], self.output_size)
 
-		for _ in range(100):
+		for _ in range(1000):
 			for instance in self.instances:
 				self.neural_net.create_input_layer(instance.data)
 				self.propagate()
 				self.atualization(instance.result, alpha, lamb)
-			# j = self.neural_net.cost(instances, lamb, self.neural_net.get_all_weights())
-			# self.save_results(j, alpha, lamb, self.file_name)
-		# print(self.neural_net.numeric_validation(instances, lamb, 0.00000005))
+		# j = self.neural_net.cost(instances, lamb, self.neural_net.get_all_weights())
+		# self.save_results(j, alpha, lamb, self.file_name)
+
+	# print(self.neural_net.numeric_validation(instances, lamb, 0.00000005))
 
 	@staticmethod
-	def save_results(n_layers, layers_size, mean, dev, lamb, filename):
+	def save_results(alpha, n_layers, layers_size, mean, dev, lamb, filename):
 		if not os.path.exists("results"):
 			os.mkdir("results")
 		file = open("results/" + filename + "Results.txt", "a", newline="\n")
-		line = str(n_layers) + " " + str(layers_size) + " " + str(lamb) + " " + str(dev) + " " + str(mean) + "\n"
+		line = str(n_layers) + " " + str(layers_size) + " " + str(lamb) + " " + str(dev) + " " + str(mean) + " " + str(alpha) + "\n"
 		file.write(line)
 		file.close()
 
@@ -306,7 +309,7 @@ class Problem:
 		result["standardDeviation"] = statistics.pstdev(scores)
 		result["meanPerformance"] = statistics.mean(scores)
 
-		self.save_results(layers_n, layers_size, result["meanPerformance"], result["standardDeviation"], lamb, self.file_name)
+		self.save_results(alpha, layers_n, layers_size, result["meanPerformance"], result["standardDeviation"], lamb, self.file_name)
 
 		return result
 
@@ -586,7 +589,9 @@ def run(alpha, architectures, lambdas, file):
 	problem.read_normalized_file(file)
 	for a in architectures:
 		for l in lambdas:
-			problem.cross_validation(10, alpha, l, a[0], a[1])
+			problem.cross_validation(10, 0.001, l, a[0], a[1])
+			problem.cross_validation(10, 0.1, l, a[0], a[1])
+
 
 def main():
 	pre_process()
@@ -605,9 +610,9 @@ def main():
 	lambdas.append(0.1)
 	lambdas.append(0.25)
 
-	run(alpha, architectures, lambdas, "./normal_files/wdbcNormalizado.txt")
+	# run(alpha, architectures, lambdas, "./normal_files/wdbcNormalizado.txt")
 	# run(alpha, architectures, lambdas, "./normal_files/ionosphereNormalizado.txt")
-	# run(alpha, architectures, lambdas, "./normal_files/wineNormalizado.txt")
+	run(alpha, architectures, lambdas, "./normal_files/wineNormalizado.txt")
 	# run(alpha, architectures, lambdas, "./normal_files/pimaNormalizado.txt")
 
 
