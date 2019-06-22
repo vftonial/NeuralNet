@@ -4,7 +4,6 @@ import math
 import statistics
 import os
 
-
 # seu valor de ativacao, a lista de pesos que entram nele
 # casos especificos para o primeiro e ultimo layer
 class Node:
@@ -12,11 +11,17 @@ class Node:
 	weights = None
 	error = 0
 	grads = None
+	batch_grads = list()
+	m = list()
+	v = list()
 
-	def __init__(self, activation, weights=None, grads=None):
+	def __init__(self, activation, weights=None, grads=None, batch_grads=list(), m=list(), v=list()):
 		self.activation = activation
 		self.weights = weights
 		self.grads = grads
+		self.batch_grads = batch_grads
+		self.m = m
+		self.v = v
 
 
 class Instance:
@@ -33,6 +38,7 @@ class NeuralNet:
 	hidden_layers = []  # [[]]
 	output_layer = []
 	regularization = 0
+	step = 1
 
 	def create_input_layer(self, activation_list):
 		self.input_layer = list()
@@ -60,7 +66,10 @@ class NeuralNet:
 		for _ in range(n_nodes):
 			weights = list(random.uniform(0, 1) for _ in range(n_weights + 1))
 			grads = list(0 for _ in range(n_weights + 1))
-			layer.append(Node(0, weights, grads))
+			batch_grads = list([] for _ in range(n_weights + 1))
+			m = list(0 for _ in range(n_weights + 1))
+			v = list(0 for _ in range(n_weights + 1))
+			layer.append(Node(0, weights, grads, batch_grads, m, v))
 		return layer
 
 	def output_layer_errors(self, expected_result):
@@ -73,49 +82,71 @@ class NeuralNet:
 		if (from_layer_i > 0):
 			from_layer = self.hidden_layers[from_layer_i]
 			to_layer = self.hidden_layers[to_layer_i]
-			self.layer_errors(from_layer, to_layer)
+			self.layer_errors(from_layer, to_layer, 1)
 			self.hidden_layer_errors(to_layer_i, to_layer_i - 1)
 
-	def layer_errors(self, from_layer, to_layer):
+	def layer_errors(self, from_layer, to_layer, bias):
 		for node_i in range(1, len(to_layer)):
 			from_layer_size = len(from_layer)
 			weights_x_error = list(
-				from_layer[j].weights[node_i] * from_layer[j].error for j in range(1, from_layer_size))
+				from_layer[j].weights[node_i] * from_layer[j].error for j in range(bias, from_layer_size))
 			node_activation = to_layer[node_i].activation
 			to_layer[node_i].error = sum(weights_x_error) * node_activation * (1 - node_activation)
 
 	def all_layers_errors(self, expected_result):
 		self.output_layer_errors(expected_result)
-		self.layer_errors(self.output_layer, self.hidden_layers[-1])
+		self.layer_errors(self.output_layer, self.hidden_layers[-1], 0)
 		self.hidden_layer_errors(len(self.hidden_layers) - 1, len(self.hidden_layers) - 2)
 
-	def gradient(self, from_layer, to_layer, first_node, second_node, lamb):
+	@staticmethod
+	def gradient(from_layer, to_layer, first_node, second_node, lamb):
 		if first_node == 0:
 			lamb = 0
 		return (from_layer[first_node].activation * to_layer[second_node].error) + (
 				lamb * to_layer[second_node].weights[first_node])
 
+	@staticmethod
+	def m(m, g):
+		return 0.9 * m + (1 - 0.9) * g
+
+	@staticmethod
+	def v(v, g):
+		return 0.999 * v + (1 - 0.999) * g * g
+
+	def mt(self, node, index, t):
+		node.m[index] = self.m(node.m[index], node.grads[index])
+		return node.m[index] / (1 - pow(0.9, t))
+
+	def vt(self, node, index, t):
+		node.v[index] = self.v(node.v[index], node.grads[index])
+		return node.v[index] / (1 - pow(0.999, t))
+
+	def adao(self, node, index, t):
+		mt = self.mt(node, index, t)
+		vt = self.vt(node, index, t)
+		return mt / (math.sqrt(vt) + 0.000000001)
+
 	def adjust_weights(self, alpha, lamb):
-		self.adjust_weights_of_layer(alpha, lamb, self.input_layer, self.hidden_layers[0])
+		self.adjust_weights_of_layer(alpha, lamb, self.input_layer, self.hidden_layers[0], 1)
 		for layer_i in range(1, len(self.hidden_layers) - 1):
 			to_layer = self.hidden_layers[layer_i + 1]
 			from_layer = self.hidden_layers[layer_i]
-			self.adjust_weights_of_layer(alpha, lamb, from_layer, to_layer)
-		self.adjust_weights_of_layer(alpha, lamb, self.hidden_layers[-1], self.output_layer)
+			self.adjust_weights_of_layer(alpha, lamb, from_layer, to_layer, 1)
+		self.adjust_weights_of_layer(alpha, lamb, self.hidden_layers[-1], self.output_layer, 0)
 
-	def adjust_weights_of_layer(self, alpha, lamb, from_layer, to_layer):
-		for node_i in range(1, len(to_layer)):
+	def adjust_weights_of_layer(self, alpha, lamb, from_layer, to_layer, bias):
+		for node_i in range(bias, len(to_layer)):
 			node = to_layer[node_i]
 			self.adjust_weights_of_node(alpha, lamb, node, node_i, from_layer, to_layer)
 
 	def adjust_weights_of_node(self, alpha, lamb, node, node_i, from_layer, to_layer):
 		for weight_i in range(len(node.weights)):
-			grad = self.gradient(from_layer, to_layer, weight_i, node_i, lamb)
-			node.grads[weight_i] = grad
-			node.weights[weight_i] = node.weights[weight_i] - alpha * grad
+			# node.weights[weight_i] = node.weights[weight_i] - alpha * node.grads[weight_i]
+			node.weights[weight_i] = node.weights[weight_i] - alpha * self.adao(node, weight_i, self.step)
 
 	def cost(self, instances, lamb, all_weights):
 		summer = 0.0
+		weights = list(map(lambda x: x * x, all_weights))
 		for i in range(len(instances)):
 			instance = instances[i]
 			for k in range(len(instance.result)):
@@ -124,7 +155,7 @@ class NeuralNet:
 				ln_f = -10 if f == 0 else math.log(f)
 				ln_1f = -10 if f == 1 else math.log(1.0 - f)
 				summer += -y * ln_f - (1.0 - y) * ln_1f
-		return (summer / len(instances)) + ((lamb * sum(all_weights)) / (2.0 * len(instances)))
+		return (summer / len(instances)) + ((lamb * sum(weights)) / (2.0 * len(instances)))
 
 	def get_all_weights(self):
 		weights = list()
@@ -164,6 +195,25 @@ class NeuralNet:
 				to_node.activation += from_node.activation * to_node.weights[from_node_index]
 			to_node.activation = self.sigmoid(to_node.activation)
 
+	def calculate_gradients(self, lamb):
+		self.calculate_gradients_of_layer(lamb, self.input_layer, self.hidden_layers[0], 1)
+		for layer_i in range(0, len(self.hidden_layers) - 1):
+			to_layer = self.hidden_layers[layer_i + 1]
+			from_layer = self.hidden_layers[layer_i]
+			self.calculate_gradients_of_layer(lamb, from_layer, to_layer, 1)
+		self.calculate_gradients_of_layer(lamb, self.hidden_layers[-1], self.output_layer, 0)
+
+	def calculate_gradients_of_layer(self, lamb, from_layer, to_layer, bias):
+		for node_i in range(bias, len(to_layer)):
+			node = to_layer[node_i]
+			self.calculate_gradients_of_node(lamb, node, node_i, from_layer, to_layer)
+
+	def calculate_gradients_of_node(self, lamb, node, node_i, from_layer, to_layer):
+		for weight_i in range(len(node.weights)):
+			grad = self.gradient(from_layer, to_layer, weight_i, node_i, lamb)
+			node.batch_grads[weight_i].append(grad)
+			node.grads[weight_i] = sum(node.batch_grads[weight_i]) / len(node.batch_grads[weight_i])
+
 	@staticmethod
 	def sigmoid(x):
 		return 1 / (1 + math.exp(- x))
@@ -186,8 +236,7 @@ class NeuralNet:
 			weights_eps_neg = weights_eps_pos
 			weights_eps_neg[i] = weights_eps_pos[i] - epsilon
 			weights_eps_pos[i] = weights_eps_pos[i] + epsilon
-			d = (self.cost(instances, lamb, weights_eps_pos) - self.cost(instances, lamb,
-			                                                             weights_eps_neg)) / 2 * epsilon
+			d = (self.cost(instances, lamb, weights_eps_pos) - self.cost(instances, lamb, weights_eps_neg)) / 2 * epsilon
 			derivative_cost.append(d)
 			derivative_errors.append(neuralnet_gradients[i] - derivative_cost[i])
 			weights_eps_pos = self.get_all_weights()
@@ -196,8 +245,6 @@ class NeuralNet:
 
 class Problem:
 	instances = []
-	training = []
-	test = []
 	output_size = 0
 	neural_net = NeuralNet()
 	file_name = ""
@@ -279,15 +326,18 @@ class Problem:
 		# adicionar o ultimo layer com base no conjunto de entradas
 		self.neural_net.create_output_layer(n_nodes[-1], self.output_size)
 
-		for _ in range(1000):
-			for instance in self.instances:
-				self.neural_net.create_input_layer(instance.data)
-				self.propagate()
-				self.atualization(instance.result, alpha, lamb)
+		for _ in range(100):
+			inst_list = [instances[i::4] for i in range(4)]
+			for inst in inst_list:
+				for i in inst:
+					self.neural_net.create_input_layer(i.data)
+					self.propagate(i.result, lamb)
+				self.update(alpha, lamb)
+		self.neural_net.step = 1
 		# j = self.neural_net.cost(instances, lamb, self.neural_net.get_all_weights())
 		# self.save_results(j, alpha, lamb, self.file_name)
 
-	# print(self.neural_net.numeric_validation(instances, lamb, 0.00000005))
+		# print(list(map(lambda x: "{0:.3f}".format(x), list(map(float, self.neural_net.numeric_validation(instances, lamb, 0.00000005))))))
 
 	@staticmethod
 	def save_results(alpha, n_layers, layers_size, mean, dev, lamb, filename):
@@ -303,7 +353,7 @@ class Problem:
 		scores = list()
 		for fold in folds:
 			self.backpropagation(layers_n, layers_size, alpha, lamb, fold["training"])
-			scores.append(self.get_performance_of_net(fold["test"]))
+			scores.append(self.get_performance_of_net(fold["test"], lamb))
 
 		result = dict()
 		result["standardDeviation"] = statistics.pstdev(scores)
@@ -313,15 +363,15 @@ class Problem:
 
 		return result
 
-	def get_performance_of_net(self, tests):
+	def get_performance_of_net(self, tests, lamb):
 		result = list()
 		for test in tests:
-			self.neural_net.create_input_layer(test.data)
-			self.propagate()
-			output = [node.activation for node in self.neural_net.output_layer]
-			result.append([list(map(int, test.result)), self.convert_output(output)])
+			self.neural_net.create_input_layer(copy.deepcopy(test.data))
+			self.propagate(test.result, lamb)
+			output = [node.activation for node in copy.deepcopy(self.neural_net.output_layer)]
+			result.append([list(map(int, copy.deepcopy(test.result))), self.convert_output(output)])
 
-		confusion_matrix = Confusion.make_confusion_matrix(result, self)
+		confusion_matrix = Confusion.make_confusion_matrix(copy.deepcopy(result), self)
 
 		return Metrics.f1(confusion_matrix)
 
@@ -358,14 +408,18 @@ class Problem:
 			result.append(fold_result)
 		return result
 
-	def propagate(self):
+	def propagate(self, expected_result, lamb):
 		self.neural_net.propagate_input_layer()
 		self.neural_net.propagate_hidden_layers()
 		self.neural_net.propagate_output_layer()
 
-	def atualization(self, expected_result, alpha, lamb):
 		self.neural_net.all_layers_errors(expected_result)
+		self.neural_net.calculate_gradients(lamb)
+
+	def update(self, alpha, lamb):
+		# self.neural_net.all_layers_errors(expected_result)
 		self.neural_net.adjust_weights(alpha, lamb)
+		self.neural_net.step += 1
 
 	def get_all_outputs(self):
 		outputs = list()
@@ -595,7 +649,7 @@ def run(alpha, architectures, lambdas, file):
 	problem.read_normalized_file(file)
 	for a in architectures:
 		for l in lambdas:
-			problem.cross_validation(10, 10, l, a[0], a[1])
+			# problem.cross_validation(10, 1, l, a[0], a[1])
 			problem.cross_validation(10, 0.1, l, a[0], a[1])
 
 
