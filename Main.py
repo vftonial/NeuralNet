@@ -41,6 +41,7 @@ class NeuralNet:
 			self.input_layer.append(Node(x))
 
 	def create_hidden_layers(self, input_size, n_nodes, n_layers):
+		self.hidden_layers = list()
 		# adicionar o primeiro layer com base no conjunto de entradas
 		first_layer = self.create_layer(input_size, n_nodes[0])
 		self.hidden_layers.append(first_layer)
@@ -54,7 +55,7 @@ class NeuralNet:
 
 	@staticmethod
 	def create_layer(n_weights, n_nodes):
-		layer = []
+		layer = list()
 		layer.append(Node(1))
 		for _ in range(n_nodes):
 			weights = list(random.uniform(0, 1) for _ in range(n_weights + 1))
@@ -267,8 +268,8 @@ class Problem:
 			instance = Instance(list(map(float, data)), list(map(float, result)))
 			self.instances.append(copy.deepcopy(instance))
 
-	def backpropagation(self, n_layers, n_nodes, alpha, lamb):
-		size_input_layer = len(self.instances[0].data)
+	def backpropagation(self, n_layers, n_nodes, alpha, lamb, instances):
+		size_input_layer = len(instances[0].data)
 
 		self.neural_net = NeuralNet()
 		# criar hidden layers
@@ -281,54 +282,78 @@ class Problem:
 				self.neural_net.create_input_layer(instance.data)
 				self.propagate()
 				self.atualization(instance.result, alpha, lamb)
-			j = self.neural_net.cost(self.instances, lamb, self.neural_net.get_all_weights())
-			self.save_results(j, alpha, lamb, self.file_name)
-		print(self.neural_net.numeric_validation(self.instances, lamb, 0.00000005))
+			# j = self.neural_net.cost(instances, lamb, self.neural_net.get_all_weights())
+			# self.save_results(j, alpha, lamb, self.file_name)
+		# print(self.neural_net.numeric_validation(instances, lamb, 0.00000005))
 
 	@staticmethod
-	def save_results(j, alpha, lamb, filename):
+	def save_results(n_layers, layers_size, mean, dev, lamb, filename):
 		if not os.path.exists("results"):
 			os.mkdir("results")
 		file = open("results/" + filename + "Results.txt", "a", newline="\n")
-		line = str(j) + " " + str(alpha) + " " + str(lamb) + "\n"
+		line = str(n_layers) + " " + str(layers_size) + " " + str(lamb) + " " + str(dev) + " " + str(mean) + "\n"
 		file.write(line)
 		file.close()
 
-	# def cross_validation(instances, attributes, k, forest_size):
-	#     folds = Problem.create_folds(instances, k)
-	#     scores = list()
-	#     for i in range(0, k):
-	#         problem = Problem()
-	#         problem.attributes = copy.deepcopy(attributes)
-	#         problem.instances = list(folds[i]["training"])
-	#         problem.createForest(forestSize)
-	#         scores.append(problem.getPerformanceOfForest(folds[i]["test"]))
-	#
-	# def create_folds(instances, k):
-	#     size = len(instances)
-	#     fold_size = int(size / k)
-	#     rest_folds = size % k
-	#     fold_sizes = [fold_size for i in range(0, k)]
-	#     for i in range(0, rest_folds):
-	#         fold_sizes[i] += 1
-	#     instances = set(copy.deepcopy(instances))
-	#
-	#     folds = list()
-	#     for fSize in fold_sizes:
-	#         fold = set(random.sample(instances, fSize))
-	#         instances -= fold
-	#         folds.append(list(copy.deepcopy(fold)))
-	#
-	#     result = list()
-	#     for fold in folds:
-	#         index = folds.index(fold)
-	#         folds_list = copy.deepcopy(folds)
-	#         del folds_list[index]
-	#         fold_result = dict()
-	#         fold_result["training"] = sum(folds_list, [])
-	#         fold_result["test"] = copy.deepcopy(fold)
-	#         result.append(fold_result)
-	#     return result
+	def cross_validation(self, k, alpha, lamb, layers_n, layers_size):
+		folds = Problem.create_folds(self.instances, k)
+		scores = list()
+		for fold in folds:
+			self.backpropagation(layers_n, layers_size, alpha, lamb, fold["training"])
+			scores.append(self.get_performance_of_net(fold["test"]))
+
+		result = dict()
+		result["standardDeviation"] = statistics.pstdev(scores)
+		result["meanPerformance"] = statistics.mean(scores)
+
+		self.save_results(layers_n, layers_size, result["meanPerformance"], result["standardDeviation"], lamb, self.file_name)
+
+		return result
+
+	def get_performance_of_net(self, tests):
+		result = list()
+		for test in tests:
+			self.neural_net.create_input_layer(test.data)
+			self.propagate()
+			output = [node.activation for node in self.neural_net.output_layer]
+			result.append([list(map(int, test.result)), self.convert_output(output)])
+
+		confusion_matrix = Confusion.make_confusion_matrix(result, self)
+
+		return Metrics.f1(confusion_matrix)
+
+	@staticmethod
+	def convert_output(output):
+		result = [0 for _ in output]
+		result[output.index(max(output))] = 1
+		return result
+
+	@staticmethod
+	def create_folds(instances, k):
+		size = len(instances)
+		fold_size = int(size / k)
+		rest_folds = size % k
+		fold_sizes = [fold_size for _ in range(0, k)]
+		for i in range(0, rest_folds):
+			fold_sizes[i] += 1
+		instances = set(copy.deepcopy(instances))
+
+		folds = list()
+		for fSize in fold_sizes:
+			fold = set(random.sample(instances, fSize))
+			instances -= fold
+			folds.append(list(copy.deepcopy(fold)))
+
+		result = list()
+		for fold in folds:
+			index = folds.index(fold)
+			folds_list = copy.deepcopy(folds)
+			del folds_list[index]
+			fold_result = dict()
+			fold_result["training"] = sum(folds_list, [])
+			fold_result["test"] = copy.deepcopy(fold)
+			result.append(fold_result)
+		return result
 
 	def propagate(self):
 		self.neural_net.propagate_input_layer()
@@ -338,6 +363,14 @@ class Problem:
 	def atualization(self, expected_result, alpha, lamb):
 		self.neural_net.all_layers_errors(expected_result)
 		self.neural_net.adjust_weights(alpha, lamb)
+
+	def get_all_outputs(self):
+		outputs = list()
+		for i in range(self.output_size):
+			output = [0 for _ in range(self.output_size)]
+			output[i] = 1
+			outputs.append(output)
+		return outputs
 
 
 class PreProcess:
@@ -473,22 +506,109 @@ class PreProcess:
 		return middle_file
 
 
-def main():
+class Confusion:
+	@staticmethod
+	def make_confusion_matrix(results, problem):
+		possibilities = problem.get_all_outputs()
+		mappingDict = dict()
+		index = 0
+
+		for possibility in possibilities:
+			mappingDict["".join(map(str, possibility))] = index
+			index += 1
+
+		number_of_possibilities = len(possibilities)
+		confusion_matrix = [[0 for _ in range(number_of_possibilities)] for _ in range(number_of_possibilities)]
+		for index in range(0, len(results)):
+			row = mappingDict["".join(map(str, results[index][0]))]
+			column = mappingDict["".join(map(str, results[index][1]))]
+			confusion_matrix[row][column] += 1
+
+		return confusion_matrix
+
+
+class Metrics:
+	@staticmethod
+	def recall(confusionMatrix):
+		recalls = list()
+		for i in range(0, len(confusionMatrix)):
+			recalls.append(Metrics.recallOfAttribute(confusionMatrix, i))
+
+		return statistics.mean(recalls)
+
+	@staticmethod
+	def precision(confusionMatrix):
+		precisions = list()
+		for i in range(0, len(confusionMatrix)):
+			precisions.append(Metrics.precisionOfAttribute(confusionMatrix, i))
+
+		return statistics.mean(precisions)
+
+	@staticmethod
+	def recallOfAttribute(confusionMatrix, index):
+		tp = confusionMatrix[index][index]
+		fn = sum(confusionMatrix[index]) - tp
+
+		return tp / (tp + fn) if tp + fn != 0 else 0
+
+	@staticmethod
+	def precisionOfAttribute(confusionMatrix, index):
+		tp = confusionMatrix[index][index]
+		fp = sum([row[index] for row in confusionMatrix]) - tp
+
+		return tp / (tp + fp) if tp + fp != 0 else 0
+
+	@staticmethod
+	def f1(confusionMatrix):
+		precision = Metrics.precision(confusionMatrix)
+		recall = Metrics.recall(confusionMatrix)
+		score = 2 * (precision * recall) / (precision + recall) if precision + recall else 0
+		return score
+
+
+def pre_process():
 	pima = "./data/pima.tsv"
 	wine = "./data/wine.data"
 	ionosphere = "./data/ionosphere.data"
 	wdbc = "./data/wdbc.data"
-	# processor = PreProcess()
-	# processor.process_file(pima, PreProcess.format_pima)
-	# processor = PreProcess()
-	# processor.process_file(wine, PreProcess.format_wine)
-	# processor = PreProcess()
-	# processor.process_file(ionosphere, PreProcess.format_ionosphere)
+	processor = PreProcess()
+	processor.process_file(pima, PreProcess.format_pima)
+	processor = PreProcess()
+	processor.process_file(wine, PreProcess.format_wine)
+	processor = PreProcess()
+	processor.process_file(ionosphere, PreProcess.format_ionosphere)
 	processor = PreProcess()
 	processor.process_file(wdbc, PreProcess.format_wdbc)
+
+
+def run(alpha, architectures, lambdas, file):
 	problem = Problem()
-	problem.read_normalized_file("./normal_files/wdbcNormalizado.txt")
-	problem.backpropagation(4, [3, 2, 3, 2], 0.3, 0.0003)
+	problem.read_normalized_file(file)
+	for a in architectures:
+		for l in lambdas:
+			problem.cross_validation(10, alpha, l, a[0], a[1])
+
+def main():
+	pre_process()
+
+	architectures = list()
+	lambdas = list()
+	alpha = 0.3
+
+	architectures.append([1, [1]])
+	architectures.append([1, [2]])
+	architectures.append([2, [1, 1]])
+	architectures.append([2, [3, 3]])
+	architectures.append([3, [2, 3, 2]])
+	architectures.append([4, [3, 4, 4, 3]])
+
+	lambdas.append(0.1)
+	lambdas.append(0.25)
+
+	run(alpha, architectures, lambdas, "./normal_files/wdbcNormalizado.txt")
+	# run(alpha, architectures, lambdas, "./normal_files/ionosphereNormalizado.txt")
+	# run(alpha, architectures, lambdas, "./normal_files/wineNormalizado.txt")
+	# run(alpha, architectures, lambdas, "./normal_files/pimaNormalizado.txt")
 
 
 if __name__ == "__main__":
