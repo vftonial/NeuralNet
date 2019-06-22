@@ -461,7 +461,13 @@ class PreProcess:
 		lines = infile.readlines()
 		for line in lines:
 			line = line.replace(",", " ")
-			line = line[:len(line) - 1] + " " + line[0]
+			if int(line[0]) == 1:
+				line = line[:len(line) - 1] + " 0"
+			else:
+				if int(line[0]) == 2:
+					line = line[:len(line) - 1] + " 1"
+				else:
+					line = line[:len(line) - 1] + " 2"
 			line = line[1:]
 			outfile.write(line + "\n")
 		return middle_file
@@ -589,7 +595,7 @@ def run(alpha, architectures, lambdas, file):
 	problem.read_normalized_file(file)
 	for a in architectures:
 		for l in lambdas:
-			problem.cross_validation(10, 0.001, l, a[0], a[1])
+			problem.cross_validation(10, 10, l, a[0], a[1])
 			problem.cross_validation(10, 0.1, l, a[0], a[1])
 
 
