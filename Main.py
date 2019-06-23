@@ -73,14 +73,14 @@ class NeuralNet:
 		if (from_layer_i > 0):
 			from_layer = self.hidden_layers[from_layer_i]
 			to_layer = self.hidden_layers[to_layer_i]
-			self.layer_errors(from_layer, to_layer)
+			self.layer_errors(from_layer, to_layer, 1)
 			self.hidden_layer_errors(to_layer_i, to_layer_i - 1)
 
-	def layer_errors(self, from_layer, to_layer):
+	def layer_errors(self, from_layer, to_layer, bias):
 		for node_i in range(1, len(to_layer)):
 			from_layer_size = len(from_layer)
 			weights_x_error = list(
-				from_layer[j].weights[node_i] * from_layer[j].error for j in range(1, from_layer_size))
+				from_layer[j].weights[node_i] * from_layer[j].error for j in range(bias, from_layer_size))
 			node_activation = to_layer[node_i].activation
 			to_layer[node_i].error = sum(weights_x_error) * node_activation * (1 - node_activation)
 
@@ -96,15 +96,15 @@ class NeuralNet:
 				lamb * to_layer[second_node].weights[first_node])
 
 	def adjust_weights(self, alpha, lamb):
-		self.adjust_weights_of_layer(alpha, lamb, self.input_layer, self.hidden_layers[0])
+		self.adjust_weights_of_layer(alpha, lamb, self.input_layer, self.hidden_layers[0], 1)
 		for layer_i in range(1, len(self.hidden_layers) - 1):
 			to_layer = self.hidden_layers[layer_i + 1]
 			from_layer = self.hidden_layers[layer_i]
-			self.adjust_weights_of_layer(alpha, lamb, from_layer, to_layer)
-		self.adjust_weights_of_layer(alpha, lamb, self.hidden_layers[-1], self.output_layer)
+			self.adjust_weights_of_layer(alpha, lamb, from_layer, to_layer, 1)
+		self.adjust_weights_of_layer(alpha, lamb, self.hidden_layers[-1], self.output_layer, 0)
 
-	def adjust_weights_of_layer(self, alpha, lamb, from_layer, to_layer):
-		for node_i in range(1, len(to_layer)):
+	def adjust_weights_of_layer(self, alpha, lamb, from_layer, to_layer, bias):
+		for node_i in range(bias, len(to_layer)):
 			node = to_layer[node_i]
 			self.adjust_weights_of_node(alpha, lamb, node, node_i, from_layer, to_layer)
 
@@ -279,7 +279,7 @@ class Problem:
 		# adicionar o ultimo layer com base no conjunto de entradas
 		self.neural_net.create_output_layer(n_nodes[-1], self.output_size)
 
-		for _ in range(1000):
+		for _ in range(1500):
 			for instance in self.instances:
 				self.neural_net.create_input_layer(instance.data)
 				self.propagate()
@@ -287,7 +287,7 @@ class Problem:
 		# j = self.neural_net.cost(instances, lamb, self.neural_net.get_all_weights())
 		# self.save_results(j, alpha, lamb, self.file_name)
 
-	# print(self.neural_net.numeric_validation(instances, lamb, 0.00000005))
+		print(self.neural_net.numeric_validation(instances, lamb, 0.00000005))
 
 	@staticmethod
 	def save_results(alpha, n_layers, layers_size, mean, dev, lamb, filename):
@@ -595,9 +595,7 @@ def run(alpha, architectures, lambdas, file):
 	problem.read_normalized_file(file)
 	for a in architectures:
 		for l in lambdas:
-			problem.cross_validation(10, 10, l, a[0], a[1])
-			problem.cross_validation(10, 0.1, l, a[0], a[1])
-
+			problem.cross_validation(10, alpha, l, a[0], a[1])
 
 def main():
 	pre_process()
@@ -616,10 +614,10 @@ def main():
 	lambdas.append(0.1)
 	lambdas.append(0.25)
 
-	# run(alpha, architectures, lambdas, "./normal_files/wdbcNormalizado.txt")
-	# run(alpha, architectures, lambdas, "./normal_files/ionosphereNormalizado.txt")
-	run(alpha, architectures, lambdas, "./normal_files/wineNormalizado.txt")
-	# run(alpha, architectures, lambdas, "./normal_files/pimaNormalizado.txt")
+	#run(0.1, [2, [1, 1]], [0.1], "./normal_files/wdbcNormalizado.txt")
+	#run(1, [1, [1]], [0.1], "./normal_files/ionosphereNormalizado.txt")
+	run(0.1, [1, [2]], [0.25], "./normal_files/wineNormalizado.txt")
+	#run(1, [1, [1]], [0.1], "./normal_files/pimaNormalizado.txt")
 
 
 if __name__ == "__main__":
