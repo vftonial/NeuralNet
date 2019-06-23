@@ -3,9 +3,13 @@ import random
 import math
 import statistics
 import os
+import sys
+from decimal import Decimal
 
 # seu valor de ativacao, a lista de pesos que entram nele
 # casos especificos para o primeiro e ultimo layer
+
+
 class Node:
 	activation = 0
 	weights = None
@@ -23,6 +27,12 @@ class Node:
 		self.m = m
 		self.v = v
 
+	def my_str(self):
+		result = ""
+		for grad in self.grads:
+			result += str("{0:.5f}".format(grad) + ", ")
+		return result[:-2]
+
 
 class Instance:
 	data = []
@@ -32,6 +42,9 @@ class Instance:
 		self.data = data
 		self.result = result
 
+	def my_str(self):
+		return ", ".join(map(str, self.data)) + "; " + ", ".join(map(str, self.result))
+
 
 class NeuralNet:
 	input_layer = []
@@ -39,6 +52,21 @@ class NeuralNet:
 	output_layer = []
 	regularization = 0
 	step = 1
+	batch = False
+	adam = False
+
+	def my_str(self):
+		lines = []
+		for layer in self.hidden_layers:
+			result = ""
+			for node in layer[1:]:
+				result += node.my_str() + "; "
+			lines.append(result[:-2] + "\n")
+		result = ""
+		for node in self.output_layer:
+			result += node.my_str() + "; "
+		lines.append(result[:-2] + "\n")
+		return "".join(map(str, lines))
 
 	def create_input_layer(self, activation_list):
 		self.input_layer = list()
@@ -79,7 +107,7 @@ class NeuralNet:
 			self.output_layer[index].error = f - y
 
 	def hidden_layer_errors(self, from_layer_i, to_layer_i):
-		if (from_layer_i > 0):
+		if from_layer_i > 0:
 			from_layer = self.hidden_layers[from_layer_i]
 			to_layer = self.hidden_layers[to_layer_i]
 			self.layer_errors(from_layer, to_layer, 1)
@@ -126,36 +154,24 @@ class NeuralNet:
 		vt = self.vt(node, index, t)
 		return mt / (math.sqrt(vt) + 0.000000001)
 
-	def adjust_weights(self, alpha, lamb):
-		self.adjust_weights_of_layer(alpha, lamb, self.input_layer, self.hidden_layers[0], 1)
+	def adjust_weights(self, alpha):
+		self.adjust_weights_of_layer(alpha, self.hidden_layers[0], 1)
 		for layer_i in range(1, len(self.hidden_layers) - 1):
 			to_layer = self.hidden_layers[layer_i + 1]
-			from_layer = self.hidden_layers[layer_i]
-			self.adjust_weights_of_layer(alpha, lamb, from_layer, to_layer, 1)
-		self.adjust_weights_of_layer(alpha, lamb, self.hidden_layers[-1], self.output_layer, 0)
+			self.adjust_weights_of_layer(alpha, to_layer, 1)
+		self.adjust_weights_of_layer(alpha, self.output_layer, 0)
 
-	def adjust_weights_of_layer(self, alpha, lamb, from_layer, to_layer, bias):
+	def adjust_weights_of_layer(self, alpha, to_layer, bias):
 		for node_i in range(bias, len(to_layer)):
 			node = to_layer[node_i]
-			self.adjust_weights_of_node(alpha, lamb, node, node_i, from_layer, to_layer)
+			self.adjust_weights_of_node(alpha, node)
 
-	def adjust_weights_of_node(self, alpha, lamb, node, node_i, from_layer, to_layer):
+	def adjust_weights_of_node(self, alpha, node):
 		for weight_i in range(len(node.weights)):
-			# node.weights[weight_i] = node.weights[weight_i] - alpha * node.grads[weight_i]
-			node.weights[weight_i] = node.weights[weight_i] - alpha * self.adao(node, weight_i, self.step)
-
-	def cost(self, instances, lamb, all_weights):
-		summer = 0.0
-		weights = list(map(lambda x: x * x, all_weights))
-		for i in range(len(instances)):
-			instance = instances[i]
-			for k in range(len(instance.result)):
-				y = instance.result[k]
-				f = float(self.output_layer[k].activation)
-				ln_f = -10 if f == 0 else math.log(f)
-				ln_1f = -10 if f == 1 else math.log(1.0 - f)
-				summer += -y * ln_f - (1.0 - y) * ln_1f
-		return (summer / len(instances)) + ((lamb * sum(weights)) / (2.0 * len(instances)))
+			if self.adam:
+				node.weights[weight_i] = node.weights[weight_i] - alpha * self.adao(node, weight_i, self.step)
+			else:
+				node.weights[weight_i] = node.weights[weight_i] - alpha * node.grads[weight_i]
 
 	def get_all_weights(self):
 		weights = list()
@@ -166,7 +182,7 @@ class NeuralNet:
 		for node in self.output_layer:
 			for w in node.weights[1:]:
 				weights.append(w)
-		return weights
+		return copy.deepcopy(weights)
 
 	def propagate_layer(self, from_layer, to_layer):
 		for to_node in to_layer[1:]:
@@ -211,36 +227,15 @@ class NeuralNet:
 	def calculate_gradients_of_node(self, lamb, node, node_i, from_layer, to_layer):
 		for weight_i in range(len(node.weights)):
 			grad = self.gradient(from_layer, to_layer, weight_i, node_i, lamb)
-			node.batch_grads[weight_i].append(grad)
-			node.grads[weight_i] = sum(node.batch_grads[weight_i]) / len(node.batch_grads[weight_i])
+			if self.adam or self.batch:
+				node.batch_grads[weight_i].append(grad)
+				node.grads[weight_i] = sum(node.batch_grads[weight_i]) / len(node.batch_grads[weight_i])
+			else:
+				node.grads[weight_i] = grad
 
 	@staticmethod
 	def sigmoid(x):
 		return 1 / (1 + math.exp(- x))
-
-	def numeric_validation(self, instances, lamb, epsilon):
-		neuralnet_gradients = []
-		derivative_cost = []
-		derivative_errors = []
-
-		for layer in self.hidden_layers:
-			for node in layer[1:]:
-				for grad in node.grads[1:]:
-					neuralnet_gradients.append(grad)
-		for node in self.output_layer:
-			for grad in node.grads[1:]:
-				neuralnet_gradients.append(grad)
-
-		weights_eps_pos = self.get_all_weights()
-		for i in range(len(weights_eps_pos)):
-			weights_eps_neg = weights_eps_pos
-			weights_eps_neg[i] = weights_eps_pos[i] - epsilon
-			weights_eps_pos[i] = weights_eps_pos[i] + epsilon
-			d = (self.cost(instances, lamb, weights_eps_pos) - self.cost(instances, lamb, weights_eps_neg)) / 2 * epsilon
-			derivative_cost.append(d)
-			derivative_errors.append(neuralnet_gradients[i] - derivative_cost[i])
-			weights_eps_pos = self.get_all_weights()
-		return derivative_errors
 
 
 class Problem:
@@ -269,51 +264,55 @@ class Problem:
 			i += 1
 
 	def read_network(self, filename):
-		layer = 0
 		file = open(filename, "r")
 		lines = file.readlines()
-		self.neural_net.regularization = int(lines[0])
+		self.neural_net.regularization = float(lines[0])
 
-		for i in range(int(lines[1]) + 1):  # +1 para adicionar o termo de bias
-			self.neural_net.input_layer.append(Node(0, []))
+		self.neural_net.create_input_layer([0 for _ in range(int(lines[1]) - 1)])
 
-		for line in lines[2:len(lines) - 1]:  # aparentemente corta antes da ultima entrada
-			for i in range(int(line) + 1):  # +1 para adicionar o termo de bias
-				self.neural_net.hidden_layers.append([])
-				self.neural_net.hidden_layers[layer].append(
-					Node(0, []))  # certamente esta errado, mas no meu teste funciona
-			layer = layer + 1
+		hidden_layers = list(map(lambda x: int(x) - 1, lines[2:(len(lines) - 1)]))
+		self.neural_net.create_hidden_layers(int(lines[1]) - 1, hidden_layers, len(hidden_layers))
 
-		for i in range(int(lines[len(lines)])):
-			self.neural_net.output_layer.append(Node(0, []))
+		self.neural_net.create_output_layer(hidden_layers[-1], int(lines[-1]))
+
+		file.close()
 
 	def read_weights(self, filename):
 		file = open(filename, "r")
 		lines = file.readlines()
 		layer = 0
-		node_index = 0
-		for line in lines[1:]:
-			if ";" in line:
-				line = line.split(";")
-				for node in line:
-					for weight in node:
-						self.neural_net.hidden_layers[layer][node_index].weights.append(int(weight))
-						node_index = node_index + 1
-					node_index = 0
+		for line in lines[:-1]:
+			nodes = line.split(";")
+			node_index = 0
+			for node in nodes:
+				weights = list(map(float, node.split(",")))
+				weight_index = 0
+				for weight in weights:
+					self.neural_net.hidden_layers[layer][node_index + 1].weights[weight_index] = float(weight)
+					weight_index += 1
+				node_index += 1
+			layer += 1
 
-			else:
-				self.neural_net.hidden_layers[layer][0].weights.append(list(map(float, line)))  # desculpafe
-			layer = layer + 1
+		nodes = lines[-1].split(";")
+		node_index = 0
+		for node in nodes:
+			weights = list(map(float, node.split(",")))
+			weight_index = 0
+			for weight in weights:
+				self.neural_net.output_layer[node_index].weights[weight_index] = float(weight)
+				weight_index += 1
+			node_index += 1
+		layer += 1
+
+		file.close()
 
 	def read_dataset(self, filename):
 		file = open(filename, "r")
 		lines = file.readlines()
 		for line in lines:
 			line = line.split(";")
-			data = line[0].split(" ")
-			data.remove(data[-1])
-			result = line[1].strip("\n").split(" ")
-			result.remove(result[0])
+			data = line[0].split(",")
+			result = line[1].split(",")
 			instance = Instance(list(map(float, data)), list(map(float, result)))
 			self.instances.append(copy.deepcopy(instance))
 
@@ -326,13 +325,16 @@ class Problem:
 		# adicionar o ultimo layer com base no conjunto de entradas
 		self.neural_net.create_output_layer(n_nodes[-1], self.output_size)
 
-		for _ in range(100):
+		for _ in range(1000):
 			inst_list = [instances[i::4] for i in range(4)]
 			for inst in inst_list:
 				for i in inst:
 					self.neural_net.create_input_layer(i.data)
 					self.propagate(i.result, lamb)
-				self.update(alpha, lamb)
+					if not self.neural_net.batch and not self.neural_net.adam:
+						self.update(alpha, lamb)
+				if self.neural_net.batch or self.neural_net.adam:
+					self.update(alpha, lamb)
 		self.neural_net.step = 1
 		# j = self.neural_net.cost(instances, lamb, self.neural_net.get_all_weights())
 		# self.save_results(j, alpha, lamb, self.file_name)
@@ -416,8 +418,12 @@ class Problem:
 		self.neural_net.all_layers_errors(expected_result)
 		self.neural_net.calculate_gradients(lamb)
 
+	def simple_propagate(self):
+		self.neural_net.propagate_input_layer()
+		self.neural_net.propagate_hidden_layers()
+		self.neural_net.propagate_output_layer()
+
 	def update(self, alpha, lamb):
-		# self.neural_net.all_layers_errors(expected_result)
 		self.neural_net.adjust_weights(alpha, lamb)
 		self.neural_net.step += 1
 
@@ -428,6 +434,62 @@ class Problem:
 			output[i] = 1
 			outputs.append(output)
 		return outputs
+
+	def numeric_validation(self, instances, lamb, epsilon):
+		neuralnet_gradients = []
+		derivative_cost = []
+		derivative_errors = []
+
+		for layer in self.neural_net.hidden_layers:
+			for node in layer[1:]:
+				for grad in node.grads:
+					neuralnet_gradients.append(grad)
+		for node in self.neural_net.output_layer:
+			for grad in node.grads:
+				neuralnet_gradients.append(grad)
+
+		for layer in self.neural_net.hidden_layers:
+			for node in layer[1:]:
+				for weight in range(len(node.weights)):
+					old_weight = node.weights[weight]
+					node.weights[weight] = float(format(old_weight - epsilon, '.7g'))
+					cost_neg = self.cost(instances, lamb, self.neural_net.get_all_weights())
+					node.weights[weight] = float(format(old_weight + epsilon, '.7g'))
+					cost_pos = self.cost(instances, lamb, self.neural_net.get_all_weights())
+					node.weights[weight] = old_weight
+					d = (cost_pos - cost_neg) / (2 * epsilon)
+					derivative_cost.append(d)
+
+		for node in self.neural_net.output_layer:
+			for weight in range(len(node.weights)):
+				old_weight = node.weights[weight]
+				node.weights[weight] = float(format(old_weight - epsilon, '.7g'))
+				cost_neg = self.cost(instances, lamb, self.neural_net.get_all_weights())
+				node.weights[weight] = float(format(old_weight + epsilon, '.7g'))
+				cost_pos = self.cost(instances, lamb, self.neural_net.get_all_weights())
+				node.weights[weight] = old_weight
+				d = (cost_pos - cost_neg) / (2 * epsilon)
+				derivative_cost.append(d)
+
+		for i in range(len(neuralnet_gradients)):
+			derivative_errors.append(neuralnet_gradients[i] - derivative_cost[i])
+
+		return derivative_errors
+
+	def cost(self, instances, lamb, all_weights):
+		summer = 0.0
+		weights = list(map(lambda x: x * x, all_weights))
+		for i in range(len(instances)):
+			instance = instances[i]
+			self.neural_net.create_input_layer(instance.data)
+			self.simple_propagate()
+			for k in range(len(instance.result)):
+				y = instance.result[k]
+				f = float(self.neural_net.output_layer[k].activation)
+				ln_f = -10 if f == 0 else math.log(f)
+				ln_1f = -10 if f == 1 else math.log(1.0 - f)
+				summer += -y * ln_f - (1.0 - y) * ln_1f
+		return (summer / len(instances)) + ((lamb * sum(weights)) / (2.0 * len(instances)))
 
 
 class PreProcess:
@@ -649,11 +711,10 @@ def run(alpha, architectures, lambdas, file):
 	problem.read_normalized_file(file)
 	for a in architectures:
 		for l in lambdas:
-			# problem.cross_validation(10, 1, l, a[0], a[1])
-			problem.cross_validation(10, 0.1, l, a[0], a[1])
+			problem.cross_validation(5, 0.1, l, a[0], a[1])
 
 
-def main():
+def not_main():
 	pre_process()
 
 	architectures = list()
@@ -672,9 +733,93 @@ def main():
 
 	# run(alpha, architectures, lambdas, "./normal_files/wdbcNormalizado.txt")
 	# run(alpha, architectures, lambdas, "./normal_files/ionosphereNormalizado.txt")
-	run(alpha, architectures, lambdas, "./normal_files/wineNormalizado.txt")
+	# run(alpha, architectures, lambdas, "./normal_files/wineNormalizado.txt")
 	# run(alpha, architectures, lambdas, "./normal_files/pimaNormalizado.txt")
 
 
+def run_with_given_network(network, weights, dataset, type=""):
+	problem = Problem()
+	problem.read_network(network)
+	problem.read_weights(weights)
+	problem.read_dataset(dataset)
+
+	if type == "adam":
+		problem.neural_net.adam = True
+		problem.neural_net.batch = True
+	elif type == "mini_batch":
+		problem.neural_net.batch = True
+
+	for instance in problem.instances:
+		problem.neural_net.create_input_layer(instance.data)
+		problem.propagate(instance.result, problem.neural_net.regularization)
+		if not os.path.exists("bruno_anderson"):
+			os.mkdir("bruno_anderson")
+		output = open("./bruno_anderson/results.txt", "a", newline="\n")
+		output.write(instance.my_str() + '\n')
+		output.write(str(problem.neural_net.regularization) + '\n')
+		output.writelines(str(problem.neural_net.my_str()) + '\n\n')
+
+
+def verify_gradients(network, weights, dataset, epsilon, type=""):
+	problem = Problem()
+	problem.read_network(network)
+	problem.read_weights(weights)
+	problem.read_dataset(dataset)
+
+	if type == "adam":
+		problem.neural_net.adam = True
+		problem.neural_net.batch = True
+	elif type == "mini_batch":
+		problem.neural_net.batch = True
+
+	for instance in problem.instances:
+		problem.neural_net.create_input_layer(instance.data)
+		problem.propagate(instance.result, problem.neural_net.regularization)
+		if not os.path.exists("bruno_anderson"):
+			os.mkdir("bruno_anderson")
+
+	verification = problem.numeric_validation(problem.instances, problem.neural_net.regularization, float(epsilon))
+	formatted_verification = convert_validation(verification, problem.neural_net)
+
+	output = open("./bruno_anderson/verification.txt", "a", newline="\n")
+	output.writelines(formatted_verification)
+
+
+def convert_validation(validation, network):
+	result = list()
+	i = 0
+	for layer in network.hidden_layers:
+		aux = ""
+		for node in layer[1:]:
+			for _ in node.weights:
+				aux += "{0:.5f}".format(validation[i]) + ", "
+				i += 1
+			aux = aux[:-2] + "; "
+		aux = aux[:-2] + "\n"
+		result.append(aux)
+
+	aux = ""
+	for node in network.output_layer:
+		for _ in node.weights:
+			aux += "{0:.5f}".format(validation[i]) + ", "
+			i += 1
+		aux = aux[:-2] + "; "
+	aux = aux[:-2] + "\n"
+	result.append(aux + "\n")
+
+	return result
+
+
+def main(args):
+	if len(args) == 3:
+		run_with_given_network(args[0], args[1], args[2])
+	elif len(args) == 4:
+		run_with_given_network(args[0], args[1], args[2], args[3])
+	elif len(args) == 5 and args[0] == "numeric_validation":
+		verify_gradients(args[1], args[2], args[3], args[4])
+	elif len(args) == 6 and args[0] == "numeric_validation":
+		verify_gradients(args[1], args[2], args[3], args[4], args[5])
+
+
 if __name__ == "__main__":
-	main()
+	main(sys.argv[1:])
