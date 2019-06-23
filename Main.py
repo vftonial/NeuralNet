@@ -86,7 +86,7 @@ class NeuralNet:
 
 	def all_layers_errors(self, expected_result):
 		self.output_layer_errors(expected_result)
-		self.layer_errors(self.output_layer, self.hidden_layers[-1])
+		self.layer_errors(self.output_layer, self.hidden_layers[-1], 0)
 		self.hidden_layer_errors(len(self.hidden_layers) - 1, len(self.hidden_layers) - 2)
 
 	def gradient(self, from_layer, to_layer, first_node, second_node, lamb):
@@ -225,13 +225,13 @@ class Problem:
 		layer = 0
 		file = open(filename, "r")
 		lines = file.readlines()
-		self.neural_net.regularization = int(lines[0])
+		self.neural_net.regularization = float(lines[0])
 
-		for i in range(int(lines[1]) + 1):  # +1 para adicionar o termo de bias
+		for i in range(int(lines[1])):  # +1 para adicionar o termo de bias
 			self.neural_net.input_layer.append(Node(0, []))
 
 		for line in lines[2:len(lines) - 1]:  # aparentemente corta antes da ultima entrada
-			for i in range(int(line) + 1):  # +1 para adicionar o termo de bias
+			for i in range(int(line)):  # +1 para adicionar o termo de bias
 				self.neural_net.hidden_layers.append([])
 				self.neural_net.hidden_layers[layer].append(
 					Node(0, []))  # certamente esta errado, mas no meu teste funciona
@@ -249,8 +249,8 @@ class Problem:
 			if ";" in line:
 				line = line.split(";")
 				for node in line:
-					for weight in node:
-						self.neural_net.hidden_layers[layer][node_index].weights.append(int(weight))
+					for weight in node.split(","):
+						self.neural_net.hidden_layers[layer][node_index].weights.append(float(weight))
 						node_index = node_index + 1
 					node_index = 0
 
@@ -284,17 +284,27 @@ class Problem:
 				self.neural_net.create_input_layer(instance.data)
 				self.propagate()
 				self.atualization(instance.result, alpha, lamb)
-		# j = self.neural_net.cost(instances, lamb, self.neural_net.get_all_weights())
-		# self.save_results(j, alpha, lamb, self.file_name)
+			# j = self.neural_net.cost(instances, lamb, self.neural_net.get_all_weights())
+			# self.save_j(j, self.file_name)
 
-		print(self.neural_net.numeric_validation(instances, lamb, 0.00000005))
+	# print(self.neural_net.numeric_validation(instances, lamb, 0.00000005))
+
+	@staticmethod
+	def save_j(j, filename):
+		if not os.path.exists("results"):
+			os.mkdir("results")
+		file = open("results/" + filename + "J.txt", "a", newline="\n")
+		line = str(j) + "\n"
+		file.write(line)
+		file.close()
 
 	@staticmethod
 	def save_results(alpha, n_layers, layers_size, mean, dev, lamb, filename):
 		if not os.path.exists("results"):
 			os.mkdir("results")
 		file = open("results/" + filename + "Results.txt", "a", newline="\n")
-		line = str(n_layers) + " " + str(layers_size) + " " + str(lamb) + " " + str(dev) + " " + str(mean) + " " + str(alpha) + "\n"
+		line = str(n_layers) + " " + str(layers_size) + " " + str(lamb) + " " + str(dev) + " " + str(mean) + " " + str(
+			alpha) + "\n"
 		file.write(line)
 		file.close()
 
@@ -309,7 +319,8 @@ class Problem:
 		result["standardDeviation"] = statistics.pstdev(scores)
 		result["meanPerformance"] = statistics.mean(scores)
 
-		self.save_results(alpha, layers_n, layers_size, result["meanPerformance"], result["standardDeviation"], lamb, self.file_name)
+		self.save_results(alpha, layers_n, layers_size, result["meanPerformance"], result["standardDeviation"], lamb,
+		                  self.file_name)
 
 		return result
 
@@ -595,29 +606,31 @@ def run(alpha, architectures, lambdas, file):
 	problem.read_normalized_file(file)
 	for a in architectures:
 		for l in lambdas:
-			problem.cross_validation(10, alpha, l, a[0], a[1])
+			for al in alpha:
+				problem.cross_validation(5, al, l, a[0], a[1])
+
 
 def main():
 	pre_process()
 
 	architectures = list()
 	lambdas = list()
-	alpha = 0.3
+	alpha = [0.01, 0.001]
 
 	architectures.append([1, [1]])
 	architectures.append([1, [2]])
 	architectures.append([2, [1, 1]])
-	architectures.append([2, [3, 3]])
-	architectures.append([3, [2, 3, 2]])
-	architectures.append([4, [3, 4, 4, 3]])
+	architectures.append([2, [5, 5]])
+	architectures.append([3, [8, 5, 3]])
+	# architectures.append([4, [3, 4, 4, 3]])
 
 	lambdas.append(0.1)
 	lambdas.append(0.25)
 
-	#run(0.1, [2, [1, 1]], [0.1], "./normal_files/wdbcNormalizado.txt")
-	#run(1, [1, [1]], [0.1], "./normal_files/ionosphereNormalizado.txt")
-	run(0.1, [1, [2]], [0.25], "./normal_files/wineNormalizado.txt")
-	#run(1, [1, [1]], [0.1], "./normal_files/pimaNormalizado.txt")
+	# run(alpha, architectures, lambdas, "./normal_files/wdbcNormalizado.txt")
+	# run(alpha, architectures, lambdas, "./normal_files/ionosphereNormalizado.txt")
+	# run(alpha, architectures, lambdas, "./normal_files/wineNormalizado.txt")
+	run(alpha, architectures, lambdas, "./normal_files/pimaNormalizado.txt")
 
 
 if __name__ == "__main__":
