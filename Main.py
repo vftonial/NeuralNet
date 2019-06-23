@@ -274,9 +274,7 @@ class Problem:
 		size_input_layer = len(instances[0].data)
 
 		self.neural_net = NeuralNet()
-		# criar hidden layers
 		self.neural_net.create_hidden_layers(size_input_layer, n_nodes, n_layers)
-		# adicionar o ultimo layer com base no conjunto de entradas
 		self.neural_net.create_output_layer(n_nodes[-1], self.output_size)
 
 		for _ in range(1500):
@@ -284,8 +282,8 @@ class Problem:
 				self.neural_net.create_input_layer(instance.data)
 				self.propagate()
 				self.atualization(instance.result, alpha, lamb)
-			# j = self.neural_net.cost(instances, lamb, self.neural_net.get_all_weights())
-			# self.save_j(j, self.file_name)
+			j = self.neural_net.cost(instances, lamb, self.neural_net.get_all_weights())
+			self.save_j(j, self.file_name)
 
 	# print(self.neural_net.numeric_validation(instances, lamb, 0.00000005))
 
@@ -607,7 +605,7 @@ def run(alpha, architectures, lambdas, file):
 	for a in architectures:
 		for l in lambdas:
 			for al in alpha:
-				problem.cross_validation(5, al, l, a[0], a[1])
+				problem.cross_validation(2, al, l, a[0], a[1])
 
 
 def main():
@@ -627,10 +625,10 @@ def main():
 	lambdas.append(0.1)
 	lambdas.append(0.25)
 
-	# run(alpha, architectures, lambdas, "./normal_files/wdbcNormalizado.txt")
-	# run(alpha, architectures, lambdas, "./normal_files/ionosphereNormalizado.txt")
-	# run(alpha, architectures, lambdas, "./normal_files/wineNormalizado.txt")
-	run(alpha, architectures, lambdas, "./normal_files/pimaNormalizado.txt")
+	run([0.01], [[1, [1]]], [0.1], "./normal_files/wdbcNormalizado.txt")
+	# run([0.01], [[1, [2]]], [0.25], "./normal_files/ionosphereNormalizado.txt")
+	# run([0.01], [[3, [8, 5, 3]]], [0.1], "./normal_files/wineNormalizado.txt")
+	# run([0.001], [[3, [8, 5, 3]]], [0.25], "./normal_files/pimaNormalizado.txt")
 
 
 if __name__ == "__main__":
