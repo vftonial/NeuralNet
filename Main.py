@@ -29,8 +29,8 @@ class Node:
 
 	def my_str(self):
 		result = ""
-		for grad in self.grads:
-			result += str("{0:.5f}".format(grad) + ", ")
+		for i in range(len(self.grads)):
+			result += str("(" + "{0:.5f}".format(self.weights[i]) + ", " + "{0:.5f}".format(self.grads[i]) + ")" + ", ")
 		return result[:-2]
 
 
@@ -325,21 +325,22 @@ class Problem:
 		# adicionar o ultimo layer com base no conjunto de entradas
 		self.neural_net.create_output_layer(n_nodes[-1], self.output_size)
 
-		for _ in range(1000):
+		self.backpropagation_with_no_init(alpha, lamb, instances, 1)
+
+	def backpropagation_with_no_init(self, alpha, lamb, instances, iterations):
+		for _ in range(iterations):
 			inst_list = [instances[i::4] for i in range(4)]
 			for inst in inst_list:
 				for i in inst:
 					self.neural_net.create_input_layer(i.data)
 					self.propagate(i.result, lamb)
 					if not self.neural_net.batch and not self.neural_net.adam:
-						self.update(alpha, lamb)
+						self.update(alpha)
+						self.save_log()
 				if self.neural_net.batch or self.neural_net.adam:
-					self.update(alpha, lamb)
+					self.update(alpha)
+					self.save_log()
 		self.neural_net.step = 1
-		# j = self.neural_net.cost(instances, lamb, self.neural_net.get_all_weights())
-		# self.save_results(j, alpha, lamb, self.file_name)
-
-		# print(list(map(lambda x: "{0:.3f}".format(x), list(map(float, self.neural_net.numeric_validation(instances, lamb, 0.00000005))))))
 
 	@staticmethod
 	def save_results(alpha, n_layers, layers_size, mean, dev, lamb, filename):
@@ -423,8 +424,8 @@ class Problem:
 		self.neural_net.propagate_hidden_layers()
 		self.neural_net.propagate_output_layer()
 
-	def update(self, alpha, lamb):
-		self.neural_net.adjust_weights(alpha, lamb)
+	def update(self, alpha):
+		self.neural_net.adjust_weights(alpha)
 		self.neural_net.step += 1
 
 	def get_all_outputs(self):
@@ -490,6 +491,13 @@ class Problem:
 				ln_1f = -10 if f == 1 else math.log(1.0 - f)
 				summer += -y * ln_f - (1.0 - y) * ln_1f
 		return (summer / len(instances)) + ((lamb * sum(weights)) / (2.0 * len(instances)))
+
+	def save_log(self):
+		if not os.path.exists("bruno_anderson"):
+			os.mkdir("bruno_anderson")
+		output = open("./bruno_anderson/log.txt", "a", newline="\n")
+		output.write(str(self.neural_net.regularization) + '\n')
+		output.writelines(str(self.neural_net.my_str()) + '\n\n')
 
 
 class PreProcess:
@@ -737,21 +745,16 @@ def not_main():
 	# run(alpha, architectures, lambdas, "./normal_files/pimaNormalizado.txt")
 
 
-def run_with_given_network(network, weights, dataset, type=""):
+def run_with_given_network(network, weights, dataset):
 	problem = Problem()
 	problem.read_network(network)
 	problem.read_weights(weights)
 	problem.read_dataset(dataset)
 
-	if type == "adam":
-		problem.neural_net.adam = True
-		problem.neural_net.batch = True
-	elif type == "mini_batch":
-		problem.neural_net.batch = True
-
 	for instance in problem.instances:
 		problem.neural_net.create_input_layer(instance.data)
 		problem.propagate(instance.result, problem.neural_net.regularization)
+		problem.update(0.01)
 		if not os.path.exists("bruno_anderson"):
 			os.mkdir("bruno_anderson")
 		output = open("./bruno_anderson/results.txt", "a", newline="\n")
@@ -760,17 +763,11 @@ def run_with_given_network(network, weights, dataset, type=""):
 		output.writelines(str(problem.neural_net.my_str()) + '\n\n')
 
 
-def verify_gradients(network, weights, dataset, epsilon, type=""):
+def verify_gradients(network, weights, dataset, epsilon):
 	problem = Problem()
 	problem.read_network(network)
 	problem.read_weights(weights)
 	problem.read_dataset(dataset)
-
-	if type == "adam":
-		problem.neural_net.adam = True
-		problem.neural_net.batch = True
-	elif type == "mini_batch":
-		problem.neural_net.batch = True
 
 	for instance in problem.instances:
 		problem.neural_net.create_input_layer(instance.data)
@@ -810,15 +807,33 @@ def convert_validation(validation, network):
 	return result
 
 
+def backpropagation(network, weights, dataset, iter=1, typee=""):
+	problem = Problem()
+	problem.read_network(network)
+	problem.read_weights(weights)
+	problem.read_dataset(dataset)
+
+	if typee == "adam":
+		problem.neural_net.adam = True
+		problem.neural_net.batch = True
+	elif typee == "mini_batch":
+		problem.neural_net.batch = True
+
+	problem.backpropagation_with_no_init(0.1, problem.neural_net.regularization, problem.instances, int(iter))
+
+
 def main(args):
+
 	if len(args) == 3:
 		run_with_given_network(args[0], args[1], args[2])
-	elif len(args) == 4:
-		run_with_given_network(args[0], args[1], args[2], args[3])
+	elif len(args) == 4 and args[0] == "run":
+		backpropagation(args[1], args[2], args[3])
 	elif len(args) == 5 and args[0] == "numeric_validation":
 		verify_gradients(args[1], args[2], args[3], args[4])
-	elif len(args) == 6 and args[0] == "numeric_validation":
-		verify_gradients(args[1], args[2], args[3], args[4], args[5])
+	elif len(args) == 5 and args[0] == "run":
+		backpropagation(args[1], args[2], args[3], args[4])
+	elif len(args) == 6 and args[0] == "run":
+		backpropagation(args[1], args[2], args[3], args[4], args[5])
 
 
 if __name__ == "__main__":
